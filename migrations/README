@@ -1,0 +1,5 @@
+Generic single-database configuration.
+
+Note: The database connection URL is in the alembic.ini and is NOT guaranteed to match the
+URL defined according to the application. In the future, alembic should be able to pull the
+URL from the .env file directly.
