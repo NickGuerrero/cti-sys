@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Note: We instantiate Base here because 1 Base object will hold the Metadata
+# Note: We instantiate Base here because a single Base object will hold the Metadata
 # Calling it in either models or main would desynchronize the ORM, as far as I'm concerned
 class Base(DeclarativeBase):
     pass
@@ -25,6 +25,3 @@ def make_session():
         yield new_session
     finally:
         new_session.close()
-
-# Only use when creating new test environments
-Base.metadata.create_all(engine)
