@@ -1,3 +1,4 @@
+from os import environ
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -9,13 +10,14 @@ class Base(DeclarativeBase):
 
 url = URL.create(
     drivername="postgresql",
-    username="<your-username>",
-    password="<your-pass>",
-    host="localhost",
-    database="mydb",
-    port=5432
+    username=environ.get("USERNAME"),
+    password=environ.get("PASSWORD"),
+    host=environ.get("HOST"),
+    database=environ.get("DATABASE"),
+    port=environ.get("PORT")
 )
-engine = create_engine(url)
+engine = create_engine(url,
+    connect_args={"sslmode": environ.get("SSLMODE")})
 
 # Session Management
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
