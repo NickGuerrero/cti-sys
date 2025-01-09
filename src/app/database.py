@@ -9,7 +9,7 @@ class Base(DeclarativeBase):
     pass
 
 url = URL.create(
-    drivername="postgresql",
+    drivername="postgresql+psycopg",
     username=environ.get("USERNAME"),
     password=environ.get("PASSWORD"),
     host=environ.get("HOST"),
