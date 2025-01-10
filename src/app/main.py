@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 from .database import make_session
 from .models import Student
@@ -11,6 +12,15 @@ app = FastAPI()
 @app.get("/")
 def read_root():
     return {"message": "cti-sys v1.0.0"}
+
+@app.get("/test-connection")
+def confirm_conn(db: Session = Depends(make_session)):
+    try:
+        result = db.execute(text("SELECT 1"))
+        if result.scalar() == 1:
+            return {"message": "Database connection succeeded"}
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Database Inaccessible")
 
 @app.get("/test-db")
 def database_test(db: Session = Depends(make_session)):
