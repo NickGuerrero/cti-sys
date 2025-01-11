@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -25,7 +25,12 @@ target_metadata = models.Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
+from os import environ as env
+def env_url():
+    url = 'postgresql+psycopg://' + env.get("USERNAME") + ":" + env.get("PASSWORD")
+    url += "@" + env.get("HOST") + ":" + env.get("PORT")
+    url += "/" + env.get("DATABASE")
+    return url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -39,7 +44,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # url = config.get_main_option("sqlalchemy.url") -> Refer to the env file/config vars for correct url
+    url = env_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -63,6 +69,7 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    connectable = create_engine(env_url())
 
     with connectable.connect() as connection:
         context.configure(

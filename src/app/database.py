@@ -1,21 +1,23 @@
+from os import environ
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Note: We instantiate Base here because 1 Base object will hold the Metadata
+# Note: We instantiate Base here because a single Base object will hold the Metadata
 # Calling it in either models or main would desynchronize the ORM, as far as I'm concerned
 class Base(DeclarativeBase):
     pass
 
 url = URL.create(
-    drivername="postgresql",
-    username="<your-username>",
-    password="<your-pass>",
-    host="localhost",
-    database="mydb",
-    port=5432
+    drivername="postgresql+psycopg",
+    username=environ.get("USERNAME"),
+    password=environ.get("PASSWORD"),
+    host=environ.get("HOST"),
+    database=environ.get("DATABASE"),
+    port=environ.get("PORT")
 )
-engine = create_engine(url)
+engine = create_engine(url,
+    connect_args={"sslmode": environ.get("SSLMODE")})
 
 # Session Management
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -25,6 +27,3 @@ def make_session():
         yield new_session
     finally:
         new_session.close()
-
-# Only use when creating new test environments
-Base.metadata.create_all(engine)
