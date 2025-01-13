@@ -27,7 +27,7 @@ target_metadata = models.Base.metadata
 # ... etc.
 from os import environ as env
 def env_url():
-    url = 'postgresql+psycopg://' + env.get("USERNAME") + ":" + env.get("PASSWORD")
+    url = 'postgresql+psycopg://' + env.get("DBUSER") + ":" + env.get("DBPASS")
     url += "@" + env.get("HOST") + ":" + env.get("PORT")
     url += "/" + env.get("DATABASE")
     return url

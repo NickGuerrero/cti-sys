@@ -1,4 +1,5 @@
 from os import environ
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -8,16 +9,23 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 class Base(DeclarativeBase):
     pass
 
+# Toggle determines whether to load an env file, or if env variables are already loaded
+# Default False (cloud environment) TODO: Move this elsewhere that's more universal
+env_required = False
+
+if env_required:
+    load_dotenv(dotenv_path=".\..\..\.env")
+
 url = URL.create(
     drivername="postgresql+psycopg",
-    username=environ.get("USERNAME"),
-    password=environ.get("PASSWORD"),
+    username=environ.get("DBUSER"),
+    password=environ.get("DBPASS"),
     host=environ.get("HOST"),
     database=environ.get("DATABASE"),
     port=environ.get("PORT")
 )
 engine = create_engine(url,
-    connect_args={"sslmode": environ.get("SSLMODE")})
+    connect_args={"sslmode": "require"})
 
 # Session Management
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
