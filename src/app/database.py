@@ -16,16 +16,7 @@ env_required = False
 if env_required:
     load_dotenv(dotenv_path=".\..\..\.env")
 
-url = URL.create(
-    drivername="postgresql+psycopg",
-    username=environ.get("DBUSER"),
-    password=environ.get("DBPASS"),
-    host=environ.get("HOST"),
-    database=environ.get("DATABASE"),
-    port=environ.get("PORT")
-)
-engine = create_engine(url,
-    connect_args={"sslmode": "require"})
+engine = create_engine(environ.get("CTI_POSTGRES_URL"))
 
 # Session Management
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)

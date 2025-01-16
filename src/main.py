@@ -15,7 +15,7 @@ def read_root():
 
 @app.get("/test-connection")
 def confirm_conn(db: Session = Depends(make_session)):
-    return db.get_bind().url
+    # return db.get_bind().url
     try:
         result = db.execute(text("SELECT 1"))
         if result.scalar() == 1:
@@ -26,7 +26,7 @@ def confirm_conn(db: Session = Depends(make_session)):
 
 @app.get("/test-db")
 def database_test(db: Session = Depends(make_session)):
-    return db.get_bind().url
+    # return db.get_bind().url
     try:
         exists = db.query(Student).first()
         if exists:
