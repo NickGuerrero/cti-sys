@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 
-from .database import make_session
-from .models import Student
-from .schemas import StudentSchema
+from .app.database import make_session
+from .app.models import Student
+from .app.schemas import StudentSchema
 
 app = FastAPI()
 
