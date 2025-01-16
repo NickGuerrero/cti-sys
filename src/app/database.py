@@ -21,7 +21,7 @@ if env_required:
 engine = create_engine(environ.get("CTI_POSTGRES_URL"))
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def make_session(SessionFactory):
+def make_session():
     new_session = SessionFactory()
     try:
         yield new_session
