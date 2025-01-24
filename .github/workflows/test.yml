@@ -20,9 +20,6 @@ jobs:
         pip install -r requirements.txt
         pip install pytest
 
-    - name: Set environment variables
-      run: echo "CTI_POSTGRES_URL=postgresql+psycopg://dev-key-Alexis:AVNS_t737XRK5CPFnoI5SpMz@db-postgresql-sfo3-89289-do-user-18752515-0.j.db.ondigitalocean.com:25060/cti?sslmode=require" >> $GITHUB_ENV
-
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
