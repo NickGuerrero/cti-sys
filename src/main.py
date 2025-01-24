@@ -4,8 +4,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 
 from .app.database import make_session
-from .app.models import Student
-from .app.schemas import StudentSchema
+from .app.models.postgres.models import Student
+from .app.models.postgres.schemas import StudentSchema
 
 app = FastAPI()
 
