@@ -20,6 +20,11 @@ jobs:
         pip install -r requirements.txt
         pip install pytest
 
+    - name: Set environment variables
+      env:
+        CTI_POSTGRES_URL: ${{ secrets.CTI_POSTGRES_URL }}
+      run: echo "CTI_POSTGRES_URL=${{ secrets.CTI_POSTGRES_URL }}" >> $GITHUB_ENV
+
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
