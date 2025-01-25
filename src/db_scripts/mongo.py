@@ -2,6 +2,7 @@ from os import environ
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
+from src.app.models.mongo.schemas import init_schemas
 from src.config import MONGO_DATABASE_NAME
 
 mongoURL = environ.get("CTI_MONGO_URL")
@@ -17,6 +18,9 @@ def ping_mongo():
 
 def get_mongo():
     return client[MONGO_DATABASE_NAME]
+
+def init_mongo():
+    init_schemas(get_mongo())
 
 async def close_mongo():
     return client.close()
