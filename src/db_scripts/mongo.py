@@ -9,7 +9,7 @@ mongoURL = environ.get("CTI_MONGO_URL")
 # Create a new client and connect to the server
 client = MongoClient(mongoURL, server_api=ServerApi('1'))
 # Send a ping to confirm a successful connection
-def ping_mongo():
+def ping_mongo(client: MongoClient):
     try:
         client.admin.command('ping')
         print("Pinged your deployment. You successfully connected to MongoDB!")
