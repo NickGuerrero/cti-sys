@@ -39,7 +39,7 @@ class StudentEmail(Base):
     __tablename__ = "student_emails"
     email: Mapped[str] = mapped_column(String, primary_key=True)
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id")) # TODO: Index here
-    is_primary: Mapped[bool] = mapped_column(Boolean)
+    is_primary: Mapped[bool] = mapped_column(Boolean) # TODO: Make sure each individual cti_id has only 1 primary email
     email_owner: Mapped["Student"] = relationship(back_populates="email_addresses")
 
 class CanvasID(Base):
