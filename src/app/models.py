@@ -7,7 +7,10 @@ from datetime import datetime, date
 from typing import List
 from .database import Base
 
-# TODO: FKs, Composite keys, and proper table definitions
+# TODO: Add nullable columns
+# TODO: Determine which back_populates are needed
+# TODO: Get test data set-up, maybe a larger set
+# TODO: Also, Alembic's not working. It's probably a file path issue
 # For PG, consider removing length limit (https://wiki.postgresql.org/wiki/Don%27t_Do_This#Don.27t_use_varchar.28n.29_by_default)
 # Composite foriegn keys: https://stackoverflow.com/questions/75747252/using-sqlalchemy-orm-with-composite-primary-keys
 
@@ -83,11 +86,6 @@ class StudentAttendance(Base):
     # Relationships
     student: Mapped["Student"] = relationship(back_populates="attendances")
     session: Mapped["Attendance"] = relationship(back_populates="attendances")
-    __table_args__ = (
-        ForeignKeyConstraint(
-            [cti_id, session_id], [Student.cti_id, Attendance.session_id]
-        ),
-    )
 
 class MissingAttendance(Base):
     __tablename__ = "missing_attendance"
