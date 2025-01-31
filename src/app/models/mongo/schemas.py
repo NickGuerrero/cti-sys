@@ -1,11 +1,11 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, Sequence
 from pymongo import IndexModel
 from pymongo.database import Database
 
 from src.config import APPLICATIONS_COLLECTION
 
 class CollectionProps:
-    def __init__(self, schema: Dict[str, Any], indexes: List[IndexModel]):
+    def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
         self.schema = schema
         self.indexes = indexes
 
@@ -45,23 +45,23 @@ collections: dict[str, CollectionProps] = {
 }
 
 def init_schemas(mongo: Database):
-    exitingCollections = set(mongo.list_collection_names())
+    existing_collections = set(mongo.list_collection_names())
 
     # if the collection exists, update with db.command; else create the collection
-    for collection in collections:
-        if collection not in exitingCollections:
+    for collection_name, collection_props in collections.items():
+        if collection_name not in existing_collections:
             # create the schema with the above defined JSON schema
             mongo.create_collection(
-                collection,
-                validator={"$jsonSchema": collections[collection].schema},
+                collection_name,
+                validator={"$jsonSchema": collection_props.schema},
                 validationLevel="moderate" # validates on writes
             )
             # if the collection requires indexes, include them upon creation
-            if len(collections[collection].indexes) > 0:
-                mongo.get_collection(collection).create_indexes(collections[collection].indexes)
+            if len(collection_props.indexes) > 0:
+                mongo.get_collection(collection_name).create_indexes(collection_props.indexes)
         else:
             mongo.command({
-                "collMod": collection,
-                "validator": {"$jsonSchema": collections[collection]},
+                "collMod": collection_name,
+                "validator": {"$jsonSchema": collection_props.schema},
                 "validationLevel": "moderate"
             })

@@ -5,9 +5,9 @@ from pymongo.server_api import ServerApi
 from src.app.models.mongo.schemas import init_schemas
 from src.config import MONGO_DATABASE_NAME
 
-mongoURL = environ.get("CTI_MONGO_URL")
+mongo_url = environ.get("CTI_MONGO_URL")
 # Create a new client and connect to the server
-client = MongoClient(mongoURL, server_api=ServerApi('1'))
+client = MongoClient(mongo_url, server_api=ServerApi('1'))
 # Send a ping to confirm a successful connection
 def ping_mongo(client: MongoClient):
     try:

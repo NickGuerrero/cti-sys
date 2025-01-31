@@ -67,19 +67,19 @@ def create_application(
 ):
     try:
         # validate that required model params are present
-        validatedApp = ApplicationCreate.model_validate(application)
+        validated_app = ApplicationCreate.model_validate(application)
 
         # add extra form attributes from application body data
-        validatedWithExtras = validatedApp.model_dump()
+        validated_with_extras = validated_app.model_dump()
         extras = application.model_extra or {}
         for prop, value in extras.items():
-            validatedWithExtras[prop] = value
+            validated_with_extras[prop] = value
         
         # insert the document with required and flexible form responses
-        result = db.get_collection(APPLICATIONS_COLLECTION).insert_one(validatedWithExtras.copy())
+        result = db.get_collection(APPLICATIONS_COLLECTION).insert_one(validated_with_extras.copy())
 
         return {
-            "applicationDict": validatedWithExtras,
+            "applicationDict": validated_with_extras,
             "_id": str(result.inserted_id)
         }
     except ValidationError as e:
