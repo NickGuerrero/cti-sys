@@ -6,7 +6,9 @@ from src.config import APPLICATIONS_COLLECTION
 
 class CollectionProps:
     def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
+        # schema as it will be stored and validated internally on MongoDB
         self.schema = schema
+        # indexes for the collection
         self.indexes = indexes
 
 collections: dict[str, CollectionProps] = {

@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
-from pydantic import ValidationError
+from fastapi import FastAPI, Depends, HTTPException, status
+from pymongo.errors import DuplicateKeyError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from pymongo.database import Database
 
-from src.app.models.mongo.models import ApplicationCreate
+from src.app.models.mongo.models import ApplicationCreate, ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
 from src.db_scripts.mongo import close_mongo, get_mongo, init_mongo , ping_mongo
 
@@ -49,7 +49,7 @@ def database_test(db: Session = Depends(make_session)):
         raise HTTPException(status_code=500, detail="Database Inaccessible")
     
 @app.get("/test-mongo")
-def test_mongo(db: Database = Depends(get_mongo)):
+def mongo_test(db: Database = Depends(get_mongo)):
     try:
         return ping_mongo(db.client)
     except Exception as e:
@@ -57,16 +57,28 @@ def test_mongo(db: Database = Depends(get_mongo)):
     
 @app.post(
     "/applications",
-    status_code=201,
-    response_description="Application successfully inserted",
-    description="Used for the creation of applications documents submitted to the program and saved for records",
+    description="Creates a new application document for a unique prospective student.",
+    response_description="Added a new application",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApplicationModel,
+    responses={
+        409: {
+            "description": "Conflict: Duplicate key",
+            "content": {
+                "application/json": { "example": { "detail": "Duplicate index key value received" }}
+            }
+        },
+    },
 )
 def create_application(
     application: ApplicationCreate,
     db: Database = Depends(get_mongo),
 ):
     try:
+        application_collection = db.get_collection(APPLICATIONS_COLLECTION)
+
         # validate that required model params are present
+        # Pydantic catches and raises its own code 422 on a failed Model.model_validate() call
         validated_app = ApplicationCreate.model_validate(application)
 
         # add extra form attributes from application body data
@@ -76,14 +88,15 @@ def create_application(
             validated_with_extras[prop] = value
         
         # insert the document with required and flexible form responses
-        result = db.get_collection(APPLICATIONS_COLLECTION).insert_one(validated_with_extras.copy())
+        app_result = application_collection.insert_one(validated_with_extras)
 
-        return {
-            "applicationDict": validated_with_extras,
-            "_id": str(result.inserted_id)
-        }
-    except ValidationError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid application fields received: {str(e)}")
+        created_app: ApplicationModel = application_collection.find_one({
+            "_id": app_result.inserted_id
+        })
+
+        return created_app
+    
+    except DuplicateKeyError as e:
+        raise HTTPException(status_code=409, detail=f"Duplicate index key value received: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{str(e)}")
-    

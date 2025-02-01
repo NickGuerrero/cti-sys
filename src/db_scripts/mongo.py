@@ -1,6 +1,8 @@
+import json
 from os import environ
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from bson import json_util
 
 from src.app.models.mongo.schemas import init_schemas
 from src.config import MONGO_DATABASE_NAME
@@ -24,3 +26,6 @@ def init_mongo():
 
 async def close_mongo():
     return client.close()
+
+def parse_bson(data):
+    return json.loads(json_util.dumps(data))
