@@ -11,7 +11,6 @@ class ApplicationBase(BaseModel):
     email: EmailStr = Field(description="An email address unique to each applicant")
     lname: str
     fname: str
-    app_submitted: datetime
 
     model_config = ConfigDict(extra="allow")
 
@@ -20,3 +19,4 @@ class ApplicationCreate(ApplicationBase):
     
 class ApplicationModel(ApplicationBase):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    app_submitted: datetime

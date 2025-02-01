@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Depends, HTTPException, status
 from pymongo.errors import DuplicateKeyError
 from sqlalchemy.orm import Session
@@ -87,6 +88,9 @@ def create_application(
         for prop, value in extras.items():
             validated_with_extras[prop] = value
         
+        # set time of application submission
+        validated_with_extras["app_submitted"] = datetime.now(timezone.utc)
+
         # insert the document with required and flexible form responses
         app_result = application_collection.insert_one(validated_with_extras)
 
