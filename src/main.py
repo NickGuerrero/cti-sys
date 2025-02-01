@@ -57,7 +57,7 @@ def mongo_test(db: Database = Depends(get_mongo)):
         raise HTTPException(status_code=500, detail=f"Error accessing MongoDB: {str(e)}")
     
 @app.post(
-    "/applications",
+    "/api/applications",
     description="Creates a new application document for a unique prospective student.",
     response_description="Added a new application",
     status_code=status.HTTP_201_CREATED,

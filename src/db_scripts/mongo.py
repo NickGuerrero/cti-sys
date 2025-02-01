@@ -7,9 +7,12 @@ from bson import json_util
 from src.app.models.mongo.schemas import init_schemas
 from src.config import MONGO_DATABASE_NAME
 
-mongo_url = environ.get("CTI_MONGO_URL")
+MONGO_URL = environ.get("CTI_MONGO_URL")
+if not MONGO_URL:
+    raise ValueError("MongoDB URL environment variable not found")
+
 # Create a new client and connect to the server
-client = MongoClient(mongo_url, server_api=ServerApi('1'))
+client = MongoClient(MONGO_URL, server_api=ServerApi('1'))
 # Send a ping to confirm a successful connection
 def ping_mongo(client: MongoClient):
     try:
