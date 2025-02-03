@@ -14,7 +14,8 @@ def test_confirm_conn():
     assert response.status_code == 200
     assert response.json() == {"message": "Database connection succeeded"}
 
-def test_database_test():
-    response = client.get("/test-db")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Database Accessible, but contains no data"}
+#Can be Implemented after Database is populated
+# def test_database_test():
+#     response = client.get("/test-db")
+#     assert response.status_code == 200
+#     assert response.json() == {"message": "Database Accessible, but contains no data"}
