@@ -5,7 +5,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List
-from .database import Base
+from ...database import Base
 
 # TODO: Add nullable columns
 # TODO: Determine which back_populates are needed
