@@ -22,7 +22,10 @@ jobs:
     - name: Set environment variables
       env:
         CTI_POSTGRES_URL: ${{ secrets.CTI_POSTGRES_URL }}
-      run: echo "CTI_POSTGRES_URL=${{ secrets.CTI_POSTGRES_URL }}" >> $GITHUB_ENV
+        CTI_MONGO_URL: ${{ secrets.CTI_MONGO_URL }}
+      run: | 
+        echo "CTI_POSTGRES_URL=${{ secrets.CTI_POSTGRES_URL }}" >> $GITHUB_ENV
+        echo "CTI_MONGO_URL=${{ secrets.CTI_MONGO_URL }}" >> $GITHUB_ENV
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
