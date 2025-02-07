@@ -96,3 +96,31 @@ class MissingAttendance(Base):
     attended_minutes: Mapped[int] = mapped_column(Integer)
     # Relationships
     session: Mapped["Attendance"] = relationship(back_populates="missing_records")
+
+class Accelerate(Base):
+    __tablename__ = "accelerate"
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    student_type: Mapped[str] = mapped_column(String)
+    accelerate_year: Mapped[int] = mapped_column(Integer)
+    accountability_group: Mapped[str] = mapped_column(String)
+    accountability_team: Mapped[int] = mapped_column(Integer)
+    pathway_goal: Mapped[str] = mapped_column(String)
+    participation_score: Mapped[float] = mapped_column(Float(3))
+    sessions_attended: Mapped[int] = mapped_column(Integer)
+    participation_streak: Mapped[int] = mapped_column(Integer)
+    returning_student: Mapped[bool] = mapped_column(Boolean)
+    inactive_weeks: Mapped[int] = mapped_column(Integer)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+class AccelerateCourseProgress(Base):
+    __tablename__ = "accelerate_course_progress"
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    latest_course: Mapped[str] = mapped_column(String)
+    latest_milestone: Mapped[str] = mapped_column(String)
+    pathway_score: Mapped[float] = mapped_column(Float(3))
+    pathway_difference: Mapped[int] = mapped_column(Integer)
+
+class AccountabilityGroup(Base):
+    __tablename__ = "accountability_group"
+    accountability_group: Mapped[str] = mapped_column(ForeignKey("accelerate.accountability_group"), primary_key=True)
+    student_accelerator: Mapped[str] = mapped_column(String)
