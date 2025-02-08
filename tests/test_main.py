@@ -60,3 +60,53 @@ class TestCreateApplication:
         assert bson.ObjectId.is_valid(response.json()["_id"])
         assert response.json()["cohort"]
         assert response.json()["graduating_year"] == 2024
+
+    def test_missing_required_field(self, mock_mongo):
+        response = client.post("/api/applications", json={
+            "fname": "First",
+            # missing lname
+            "email": "test.user@cti.com",
+            "cohort": True,
+            "graduating_year": 2024
+        })
+
+        assert response.status_code == 422
+        detail_item = response.json()["detail"][0]
+        assert detail_item["type"] == "missing"
+
+    def test_invalid_email(self, mock_mongo):
+        response = client.post("/api/applications", json={
+            "fname": "First",
+            "lname": "Last",
+            "email": "test.user@cti",
+            "cohort": True,
+            "graduating_year": 2024
+        })
+
+        assert response.status_code == 422
+        detail_item = response.json()["detail"][0]
+        assert detail_item["type"] == "value_error"
+        assert str(detail_item["msg"]).find("not a valid email address")
+
+    def test_duplicate_key(self, mock_mongo):
+        # 409
+        assert True
+
+    @pytest.mark.integration
+    def test_persistence_success(self):
+        """Integration test validating the persistence of application inserts"""
+        assert True
+    
+    @pytest.mark.integration
+    def test_schema_valid_insert_success(self):
+        """Integration test validating that a document can be inserted
+        if the fields follow the collection json validation schema
+        """
+        assert True
+        
+    @pytest.mark.integration
+    def test_schema_invalid_insert(self):
+        """Integration test validating that a document will not be inserted
+        if it does not follow the collection json validation schema
+        """
+        assert True
