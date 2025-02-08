@@ -46,7 +46,7 @@ class StudentEmail(Base):
 
     __table_args__ = (
         # Unique index: Make sure each individual cti_id has only 1 primary email
-        Index("single_primary_email", "cti_id", postgresql_where=(is_primary.is_(True)), unique=True)
+        Index("single_primary_email", "cti_id", postgresql_where=(is_primary.is_(True)), unique=True),
     )
 
 class CanvasID(Base):
@@ -57,7 +57,7 @@ class CanvasID(Base):
 
     __table_args__ = (
         # Index on Canvas ID
-        Index("unique_canvas_id", "canvas_id", unique=True)
+        Index("unique_canvas_id", "canvas_id", unique=True),
     )
 
 class Ethnicity(Base):
@@ -114,7 +114,7 @@ class Accelerate(Base):
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
     student_type: Mapped[str] = mapped_column(String, default="regular") # Regular, Wave 2, other classifications
     target_year: Mapped[int] = mapped_column(Integer) # 2024 - 2025 => 2025
-    accountability_group: Mapped[Optional[str]] = mapped_column(String)
+    accountability_group: Mapped[Optional[int]] = mapped_column(ForeignKey("accountability_group.ag_id"))
     accountability_team: Mapped[Optional[int]] = mapped_column(Integer)
     pathway_goal: Mapped[str] = mapped_column(String) # Summer Tech Internship, REU, etc.
     participation_score: Mapped[Optional[float]] = mapped_column(Float(3))
@@ -125,7 +125,7 @@ class Accelerate(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Relationships
     progress_record: Mapped["AccelerateCourseProgress"] = relationship(back_populates="owner")
-    ag_record: Mapped["AccountabilityGroup"] = relationship(back_populates="owner")
+    ag_record: Mapped["AccountabilityGroup"] = relationship(back_populates="ag_students")
 
 # Note: Columns seperated from above table since progress may be handled differently
 class AccelerateCourseProgress(Base):
@@ -139,6 +139,7 @@ class AccelerateCourseProgress(Base):
 
 class AccountabilityGroup(Base):
     __tablename__ = "accountability_group"
-    accountability_group: Mapped[str] = mapped_column(ForeignKey("accelerate.accountability_group"), primary_key=True)
+    ag_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_name: Mapped[str] = mapped_column(String)
     student_accelerator: Mapped[str] = mapped_column(String)
-    owner: Mapped["Accelerate"] = relationship(back_populates="ag_record")
+    ag_students: Mapped[List["Accelerate"]] = relationship(back_populates="ag_record")
