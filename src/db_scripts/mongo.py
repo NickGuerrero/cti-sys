@@ -4,7 +4,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson import json_util
 
-from src.app.models.mongo.schemas import init_schemas
+from src.app.models.mongo.schemas import init_collections
 from src.config import MONGO_DATABASE_NAME
 
 MONGO_URL = environ.get("CTI_MONGO_URL")
@@ -25,7 +25,7 @@ def get_mongo():
     return client[MONGO_DATABASE_NAME]
 
 def init_mongo():
-    init_schemas(get_mongo())
+    init_collections(get_mongo())
 
 async def close_mongo():
     return client.close()

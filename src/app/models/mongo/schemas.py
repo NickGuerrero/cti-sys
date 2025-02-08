@@ -46,18 +46,27 @@ collections: dict[str, CollectionProps] = {
     )
 }
 
-def init_schemas(mongo: Database):
+def init_collections(mongo: Database, with_validators=True):
+    """
+    Initializes collections and their indexes.
+    Will be deprecated and replaced with Mongo migrations.
+    """
     existing_collections = set(mongo.list_collection_names())
 
     # if the collection exists, update with db.command; else create the collection
     for collection_name, collection_props in collections.items():
         if collection_name not in existing_collections:
             # create the schema with the above defined JSON schema
-            mongo.create_collection(
-                collection_name,
-                validator={"$jsonSchema": collection_props.schema},
-                validationLevel="moderate" # validates on writes
-            )
+            
+            if with_validators:
+                mongo.create_collection(
+                    collection_name,
+                    validator={"$jsonSchema": collection_props.schema},
+                    validationLevel="moderate" # validates on writes
+                )
+            else:
+                mongo.create_collection(collection_name)
+
             # if the collection requires indexes, include them upon creation
             if len(collection_props.indexes) > 0:
                 mongo.get_collection(collection_name).create_indexes(collection_props.indexes)
