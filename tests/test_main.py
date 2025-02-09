@@ -1,9 +1,10 @@
+from typing import Generator
 import bson
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
 from src.app.models.mongo.schemas import init_collections
-from src.config import MONGO_DATABASE_NAME
+from src.config import APPLICATIONS_COLLECTION, MONGO_DATABASE_NAME
 from src.db_scripts.mongo import get_mongo
 from src.main import app
 
@@ -37,7 +38,7 @@ def mock_mongo():
     mock_client.close()
 
 class TestCreateApplication:
-    def test_min_required_success(self, mock_mongo):
+    def test_min_required_success(self, mock_mongo: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -47,7 +48,7 @@ class TestCreateApplication:
         assert response.status_code == 201
         assert bson.ObjectId.is_valid(response.json()["_id"])
 
-    def test_extras_success(self, mock_mongo):
+    def test_extras_success(self, mock_mongo: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -61,7 +62,7 @@ class TestCreateApplication:
         assert response.json()["cohort"]
         assert response.json()["graduating_year"] == 2024
 
-    def test_missing_required_field(self, mock_mongo):
+    def test_missing_required_field(self, mock_mongo: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             # missing lname
@@ -71,10 +72,10 @@ class TestCreateApplication:
         })
 
         assert response.status_code == 422
-        detail_item = response.json()["detail"][0]
-        assert detail_item["type"] == "missing"
+        detail = response.json()["detail"][0]
+        assert detail["type"] == "missing"
 
-    def test_invalid_email(self, mock_mongo):
+    def test_invalid_email(self, mock_mongo: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -84,13 +85,30 @@ class TestCreateApplication:
         })
 
         assert response.status_code == 422
-        detail_item = response.json()["detail"][0]
-        assert detail_item["type"] == "value_error"
-        assert str(detail_item["msg"]).find("not a valid email address")
+        detail = response.json()["detail"][0]
+        assert detail["type"] == "value_error"
+        assert str(detail["msg"]).find("not a valid email address") != -1
 
-    def test_duplicate_key(self, mock_mongo):
-        # 409
-        assert True
+    def test_duplicate_key(self, mock_mongo: mongomock.Database):
+        mock_mongo.get_collection(APPLICATIONS_COLLECTION).insert_one({
+            "fname": "First",
+            "lname": "Last",
+            "email": "test.user@cti.com", # email is a unique index
+            "cohort": True,
+            "graduating_year": 2024
+        })
+        
+        response = client.post("/api/applications", json={
+            "fname": "First",
+            "lname": "Last",
+            "email": "test.user@cti.com",
+            "cohort": True,
+            "graduating_year": 2024
+        })
+
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert str(detail).find("Duplicate index key") != -1
 
     @pytest.mark.integration
     def test_persistence_success(self):
