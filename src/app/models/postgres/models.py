@@ -13,6 +13,11 @@ from ...database import Base
 # For PG, consider removing length limit (https://wiki.postgresql.org/wiki/Don%27t_Do_This#Don.27t_use_varchar.28n.29_by_default)
 # Composite foriegn keys: https://stackoverflow.com/questions/75747252/using-sqlalchemy-orm-with-composite-primary-keys
 
+# Note on relationships (https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html)
+# Default to lazy="select" if you don't expect to need the valuees often
+# lazy="joined" is for strongly-coupled relationships (like canvas_id)
+# You may need to modify loading for better performance, note this when modifying
+
 ###
 # Core Student Data: Shared across all programs
 ###
@@ -23,7 +28,7 @@ class Student(Base):
     pname: Mapped[Optional[str]] = mapped_column(String)
     lname: Mapped[str] = mapped_column(String, nullable=False)
     join_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.CURRENT_TIMESTAMP(), nullable=False)
-    target_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_year: Mapped[int] = mapped_column(Integer, nullable=False) # 2024 - 2025 => 2025
     gender: Mapped[Optional[str]] = mapped_column(String)
     first_gen: Mapped[Optional[bool]] = mapped_column(Boolean)
     institution: Mapped[Optional[str]] = mapped_column(String)
@@ -32,9 +37,10 @@ class Student(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     cohort_lc: Mapped[bool] = mapped_column(Boolean, default=False)
     # Relationships
-    email_addresses: Mapped[List["StudentEmail"]] = relationship(back_populates="email_owner")
-    canvas_id: Mapped["CanvasID"] = relationship(back_populates="id_owner")
-    ethnicities: Mapped[List["Ethnicity"]] = relationship(back_populates="eth_owner")
+    email_addresses: Mapped[List["StudentEmail"]] = relationship(back_populates="email_owner", cascade="all, delete-orphan")
+    canvas_id: Mapped["CanvasID"] = relationship(back_populates="id_owner", lazy="joined", cascade="all, delete-orphan")
+    ethnicities: Mapped[List["Ethnicity"]] = relationship(back_populates="eth_owner", lazy="joined", cascade="all, delete-orphan")
+    accelerate_record: Mapped["Accelerate"] = relationship(back_populates="acc_owner", cascade="all, delete-orphan")
     # Note: Attendance relationship removed, use joins for explicit attendance processes
 
 class StudentEmail(Base):
@@ -65,7 +71,7 @@ class Ethnicity(Base):
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
     ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
     details: Mapped[Optional[str]] = mapped_column(String)
-    eth_owner: Mapped["Student"] = relationship(back_populates="canvas_id")
+    eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
 
 ##################################
 # Attendance Data
@@ -113,24 +119,24 @@ class Accelerate(Base):
     __tablename__ = "accelerate"
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
     student_type: Mapped[str] = mapped_column(String, default="regular") # Regular, Wave 2, other classifications
-    target_year: Mapped[int] = mapped_column(Integer) # 2024 - 2025 => 2025
     accountability_group: Mapped[Optional[int]] = mapped_column(ForeignKey("accountability_group.ag_id"))
     accountability_team: Mapped[Optional[int]] = mapped_column(Integer)
-    pathway_goal: Mapped[str] = mapped_column(String) # Summer Tech Internship, REU, etc.
+    pathway_goal: Mapped[Optional[str]] = mapped_column(String) # Summer Tech Internship, REU, etc.
     participation_score: Mapped[Optional[float]] = mapped_column(Float(3))
     sessions_attended: Mapped[int] = mapped_column(Integer, default=0)
     participation_streak: Mapped[int] = mapped_column(Integer, default=0)
     returning_student: Mapped[bool] = mapped_column(Boolean, default=False)
     inactive_weeks: Mapped[int] = mapped_column(Integer, default=0)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True) # Accelerate specific activity
     # Relationships
+    acc_owner: Mapped["Student"] = relationship(back_populates="accelerate_record")
     progress_record: Mapped["AccelerateCourseProgress"] = relationship(back_populates="owner")
     ag_record: Mapped["AccountabilityGroup"] = relationship(back_populates="ag_students")
 
 # Note: Columns seperated from above table since progress may be handled differently
 class AccelerateCourseProgress(Base):
     __tablename__ = "accelerate_course_progress"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("accelerate.cti_id"), primary_key=True)
     latest_course: Mapped[Optional[str]] = mapped_column(String)
     latest_milestone: Mapped[Optional[str]] = mapped_column(String)
     pathway_score: Mapped[Optional[float]] = mapped_column(Float(3))
