@@ -13,13 +13,10 @@ if not MONGO_URL:
 
 # Create a new client and connect to the server
 client = MongoClient(MONGO_URL, server_api=ServerApi('1'))
+
 # Send a ping to confirm a successful connection
 def ping_mongo(client: MongoClient):
-    try:
-        client.admin.command('ping')
-        print("Pinged your deployment. You successfully connected to MongoDB!")
-    except Exception as e:
-        print(e)
+	client.admin.command('ping')
 
 def get_mongo():
     return client[MONGO_DATABASE_NAME]
