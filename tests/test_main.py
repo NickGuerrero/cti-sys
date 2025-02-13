@@ -114,6 +114,7 @@ class TestCreateApplication:
         assert "not a valid email address" in detail["msg"]
 
     def test_failure_duplicate_email_key(self, mock_mongo_db: mongomock.Database):
+        # pydantic model used to validate test data before inserting as mongomock does not support json schema validation
         app = ApplicationModel(
             fname="First",
             lname="Last",
