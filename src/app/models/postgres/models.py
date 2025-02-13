@@ -46,7 +46,7 @@ class Student(Base):
 class StudentEmail(Base):
     __tablename__ = "student_emails"
     email: Mapped[str] = mapped_column(String, primary_key=True)
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"))
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), nullable=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     email_owner: Mapped["Student"] = relationship(back_populates="email_addresses")
 
@@ -57,7 +57,7 @@ class StudentEmail(Base):
 
 class CanvasID(Base):
     __tablename__ = "canvas_ids"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     canvas_id: Mapped[int] = mapped_column(Integer, nullable=False)
     id_owner: Mapped["Student"] = relationship(back_populates="canvas_id")
 
@@ -68,7 +68,7 @@ class CanvasID(Base):
 
 class Ethnicity(Base):
     __tablename__ = "ethnicities"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
     details: Mapped[Optional[str]] = mapped_column(String)
     eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
@@ -93,7 +93,7 @@ class Attendance(Base):
 
 class StudentAttendance(Base):
     __tablename__ = "student_attendance"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("attendance.session_id"), primary_key=True)
     peardeck_score: Mapped[float] = mapped_column(Float(3), default=0)
     attended_minutes: Mapped[int] = mapped_column(Integer, default=0)
@@ -104,7 +104,7 @@ class StudentAttendance(Base):
 class MissingAttendance(Base):
     __tablename__ = "missing_attendance"
     email: Mapped[str] = mapped_column(String, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("attendance.session_id"), primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("attendance.session_id", ondelete="CASCADE"), primary_key=True)
     name: Mapped[Optional[str]] = mapped_column(String)
     peardeck_score: Mapped[Optional[int]] = mapped_column(Float(3))
     attended_minutes: Mapped[Optional[int]] = mapped_column(Integer)
@@ -117,7 +117,7 @@ class MissingAttendance(Base):
 
 class Accelerate(Base):
     __tablename__ = "accelerate"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     student_type: Mapped[str] = mapped_column(String, default="regular") # Regular, Wave 2, other classifications
     accountability_group: Mapped[Optional[int]] = mapped_column(ForeignKey("accountability_group.ag_id"))
     accountability_team: Mapped[Optional[int]] = mapped_column(Integer)
@@ -136,7 +136,7 @@ class Accelerate(Base):
 # Note: Columns seperated from above table since progress may be handled differently
 class AccelerateCourseProgress(Base):
     __tablename__ = "accelerate_course_progress"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("accelerate.cti_id"), primary_key=True)
+    cti_id: Mapped[int] = mapped_column(ForeignKey("accelerate.cti_id", ondelete="CASCADE"), primary_key=True)
     latest_course: Mapped[Optional[str]] = mapped_column(String)
     latest_milestone: Mapped[Optional[str]] = mapped_column(String)
     pathway_score: Mapped[Optional[float]] = mapped_column(Float(3))
