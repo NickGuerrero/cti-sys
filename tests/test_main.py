@@ -28,7 +28,7 @@ def test_confirm_conn():
     assert response.json() == {"message": "Database connection succeeded"}
 
 @pytest.fixture(scope="function")
-def mock_mongo():
+def mock_mongo_db():
     """Injection for MongoDB dependency intended for fast, in-memory unit testing"""
     mock_client = mongomock.MongoClient()
     db = mock_client[MONGO_DATABASE_NAME]
@@ -45,7 +45,7 @@ def mock_mongo():
     mock_client.close()
 
 @pytest.fixture(scope="function")
-def test_mongo():
+def real_mongo_db():
     """Injection for MongoDB dependency intended for wide scope, accurate integration testing"""
     # Consider replacing this with a conditionally created local instance (in GitHub Actions)
     client = pymongo.MongoClient(os.environ.get("CTI_MONGO_URL"))
@@ -62,7 +62,7 @@ def test_mongo():
     client.close()
 
 class TestCreateApplication:
-    def test_success_min_required_fields(self, mock_mongo: mongomock.Database):
+    def test_success_min_required_fields(self, mock_mongo_db: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -72,7 +72,7 @@ class TestCreateApplication:
         assert response.status_code == 201
         assert bson.ObjectId.is_valid(response.json()["_id"])
 
-    def test_success_with_extra_fields(self, mock_mongo: mongomock.Database):
+    def test_success_with_extra_fields(self, mock_mongo_db: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -86,7 +86,7 @@ class TestCreateApplication:
         assert response.json()["cohort"]
         assert response.json()["graduating_year"] == 2024
 
-    def test_failure_missing_required_last_name(self, mock_mongo: mongomock.Database):
+    def test_failure_missing_required_last_name(self, mock_mongo_db: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             # missing lname
@@ -99,7 +99,7 @@ class TestCreateApplication:
         detail = response.json()["detail"][0]
         assert detail["type"] == "missing"
 
-    def test_failure_invalid_email(self, mock_mongo: mongomock.Database):
+    def test_failure_invalid_email(self, mock_mongo_db: mongomock.Database):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -113,7 +113,7 @@ class TestCreateApplication:
         assert detail["type"] == "value_error"
         assert "not a valid email address" in detail["msg"]
 
-    def test_failure_duplicate_email_key(self, mock_mongo: mongomock.Database):
+    def test_failure_duplicate_email_key(self, mock_mongo_db: mongomock.Database):
         app = ApplicationModel(
             fname="First",
             lname="Last",
@@ -123,7 +123,7 @@ class TestCreateApplication:
             app_submitted=datetime.now(timezone.utc)
         )
         
-        mock_mongo.get_collection(APPLICATIONS_COLLECTION).insert_one(app.model_dump())
+        mock_mongo_db.get_collection(APPLICATIONS_COLLECTION).insert_one(app.model_dump())
         
         response = client.post("/api/applications", json={
             "fname": "First",
@@ -138,11 +138,11 @@ class TestCreateApplication:
         assert "Duplicate index key" in detail
 
     @pytest.mark.integration
-    def test_application_persistence(self, test_mongo: pymongo.database.Database):
+    def test_application_persistence(self, real_mongo_db: pymongo.database.Database):
         """Integration test validating that a document can be inserted and found
         if the fields follow the collection schema
         """
-        app_collection = test_mongo.get_collection(APPLICATIONS_COLLECTION)
+        app_collection = real_mongo_db.get_collection(APPLICATIONS_COLLECTION)
         prev_count = app_collection.count_documents({})
 
         response = client.post("/api/applications", json={
@@ -159,13 +159,13 @@ class TestCreateApplication:
         assert prev_count + 1 == app_collection.count_documents({})
     
     @pytest.mark.integration
-    def test_application_schema_rejects_invalid_insert(self, test_mongo: pymongo.database.Database):
+    def test_application_schema_rejects_invalid_insert(self, real_mongo_db: pymongo.database.Database):
         """Integration test validating that a document will not be inserted
         if it does not follow the collection json validation schema.
         
         Relevant for inserts performed outside of API.
         """
-        app_collection = test_mongo.get_collection(APPLICATIONS_COLLECTION)
+        app_collection = real_mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
         with pytest.raises(pymongo.errors.WriteError, match="Document failed validation"):
             app_collection.insert_one({
