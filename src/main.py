@@ -52,7 +52,8 @@ def database_test(db: Session = Depends(make_session)):
 @app.get("/test-mongo")
 def mongo_test(db: Database = Depends(get_mongo)):
     try:
-        return ping_mongo(db.client)
+        ping_mongo(db.client)
+        return {"message": "Successfully accessed MongoDB"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error accessing MongoDB: {str(e)}")
     
