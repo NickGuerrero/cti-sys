@@ -4,3 +4,5 @@
 MONGO_DATABASE_NAME = "cti_mongo_db"
 
 APPLICATIONS_COLLECTION = "applications"
+ACCELERATE_FLEX_COLLECTION = "accelerate_flex"
+PATHWAY_GOALS_COLLECTION = "pathway_goals"

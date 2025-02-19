@@ -20,3 +20,8 @@ class ApplicationCreate(ApplicationBase):
 class ApplicationModel(ApplicationBase):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     app_submitted: datetime
+
+class DeepWork(BaseModel):
+    day: str = Field(description="")
+    time: str = Field(description="")
+    sprint: str = Field(description="")

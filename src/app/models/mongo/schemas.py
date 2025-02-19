@@ -2,7 +2,7 @@ from typing import Any, Dict, Sequence
 from pymongo import IndexModel
 from pymongo.database import Database
 
-from src.config import APPLICATIONS_COLLECTION
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, PATHWAY_GOALS_COLLECTION
 
 class CollectionProps:
     def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
@@ -42,6 +42,46 @@ collections: dict[str, CollectionProps] = {
         },
         indexes=[
             IndexModel("email", unique=True)
+        ]
+    ),
+    ACCELERATE_FLEX_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Accelerate Flex Object Validation",
+            "required": ["cti_id", "selected_deep_work", "academic_goals", "phone", "academic_year", "grad_year", "summers_left", "cs_exp", "cs_courses", "math_courses", "program_expectations", "career_outlook", "heard_about"],
+            "properties": {
+                "cti_id": {},
+                "selected_deep_work": {},
+                "academic_goals": {},
+                "phone": {},
+                "academic_year": {},
+                "grad_year": {},
+                "summers_left": {},
+                "cs_exp": {},
+                "cs_courses": {},
+                "math_courses": {},
+                "program_expectations": {},
+                "career_outlook": {},
+                "heard_about": {},
+            },
+            "additionalProperties": True
+        },
+        indexes=[
+
+        ]
+    ),
+    PATHWAY_GOALS_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Pathway Goals Object Validation",
+            "required": ["pathway_desc", "course_req"],
+            "properties": {
+                "pathway_desc": {},
+                "course_req": {},
+            }
+        },
+        indexes=[
+
         ]
     )
 }
