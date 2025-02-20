@@ -18,18 +18,50 @@ CTI stands for [Computing Talent Initiative][website-url]. A program spearheaded
 This project is primarily being developed internally and for internal use. Many planning documents are internal as well, so if you're interested in contributing, please contact the repository owner, [Nicolas Guerrero][owner-email].
 
 ## Getting Started
-Built with FastAPI
-
-### Dependencies
 
 ### Build Instructions
 
-## Use Case Examples
+#### Database Set-Up
+You'll need both a PostgreSQL Database and a MongoDB Database. You'll also need admin permissions to set-up the tables/collections. Make sure you have the following connection strings set (either through a env file, Heroku's conifg vars, or an environment variable). Additionally, if you are building from scratch, make sure to install the requirements.txt, since you'll need SQLAlchemy and Pymongo to run the initialization scripts.
+
+If you are part of the development team, you should have received a .env file with credentials for the development databases.
+```
+CTI_POSTGRES_URL="postgresql+psycopg://USER:PASS@HOST:PORT/DATABASE?sslmode=require"
+CTI_MONGO_URL="mongodb+srv://USER:PASS@HOST/DATABASE?tls=true&retryWrites=true&w=majority&authSource=admin&replicaSet=REPLICASET&appName=APP"
+```
+
+#### Postgres Set-Up
+1. Run the create_database.py script ```python -m src.db_scripts.create_database.py```
+2. (Optional): Add test data (Will be prepared for the development team at a later time)
+
+#### MongoDB Set-Up
+Currently, the database is automatically created on deploy, along with collections. This database will persist, so as long as you have the correct admin permissions, there should not be any direct action needed at this time.
+
+#### Heroku Deployment (Easy Method)
+1. Create a new Heroku app (If you're part of the Heroku team, the app has already been created for you)
+2. Go to Deploy. Connect your Heroku account with your GitHub account
+3. Under Manual Deploy, you can select which branch you want to deploy
+4. After Heroku finishes building the deployed changes, you will be provided the application URL
+Everything should be handled by the Procfile, so look there if you need to modify runtime.
+
+#### Local Deployment
+1. Create a virtual environment and install the requirements.txt
+2. Make sure the environment variables are set
+3. You can run the application either through FastAPI directly, or with Gunicorn (Not Windows)
+```
+// Running FastAPI directly
+fastapi dev ./path/to/main.py
+
+// Running Gunicorn (default)
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker src.main:app
+```
+4. Your application should be hosted through localhost, your shell should return a URL
 
 ## Contributing
-Please check our contributing guide here. As mentioned in the introduction, the project's not looking for new members outside the organization due to the onboarding time, but you can contact us if you're really interested in this project.
+Please check our contributing guide. As mentioned in the introduction, the project's not looking for new members outside the organization due to the onboarding time, but you can contact us if you're really interested in this project.
 
 ## Roadmap
+TODO
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
