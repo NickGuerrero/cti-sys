@@ -22,22 +22,28 @@ class ApplicationModel(ApplicationBase):
     app_submitted: datetime
 
 class DeepWork(BaseModel):
-    day: str = Field(description="")
-    time: str = Field(description="")
-    sprint: str = Field(description="")
+    day: str = Field(description="Weekday of the deepwork session")
+    time: str = Field(description="Times for start and end of the deepwork session")
+    sprint: str = Field(description="Which sprint this deepwork session is associated with")
     
 class AccelerateFlex(BaseModel):
-    # define all required fields
-    cit_id: int
-    selected_deep_work: list[DeepWork]
-    academic_goals: int
-    phone: str
-    academic_year: str
+    cit_id: int = Field(description="ID for student across all db domains")
+    selected_deep_work: list[DeepWork] = Field(description="Deepwork sessions selected for expected attendance")
+    academic_goals: list[str] = Field(description="Student's expected academic outcomes")
+    phone: str = Field(description="Student's phone number")
+    academic_year: str = Field(description="Applicant's year in school")
+    grad_year: int = Field(description="Student's expected graduation year")
+    summers_left: int = Field(description="Number of summers the applicant has left before graduation")
+    cs_exp: bool = Field(description="Whether the student has CS/programming experience")
+    cs_courses: list[str] = Field(description="list of the CS classes the student has taken")
+    math_courses: list[str] = Field(description="List of math classes the student as taken")
+    program_expectation: str = Field(description="What the student is aiming to get out of the program")
+    career_outlook: str = Field(description="Where the student sees themselves in 2-4 years")
+    heard_about: str = Field(description="How the student heard about Accelerate")
     
-    
-	# define configuration options -> extra allowed
-    pass
+    model_config = ConfigDict(extra="allow")
 
 class PathwayGoals(BaseModel):
-    # define all required fields
-    pass
+    pathway_goal: str = Field(description="Name for the pathway goal")
+    pathway_desc: str = Field(description="Description of the pathway goal")
+    course_req: str = Field(description="Courses required for the pathway goal")

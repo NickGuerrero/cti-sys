@@ -53,7 +53,7 @@ collections: dict[str, CollectionProps] = {
             "properties": {
                 "cti_id": {
                     "bsonType": "int",
-                    "description": "Derived from Postgres database's Student table PK"
+                    "description": "Must include the ID derived from Postgres database's Student table PK as an integer value"
                 },
                 "selected_deep_work": {
                     "bsonType": "object",
@@ -69,6 +69,7 @@ collections: dict[str, CollectionProps] = {
                         },
                         "sprint": {
                             "bsonType": "string", # todo: format required for this?
+                            "description": "Must include the sprint this deepwork session is associated with"
                         }
                     }
                 },
@@ -82,7 +83,7 @@ collections: dict[str, CollectionProps] = {
                 },
                 "academic_year": {
                     "bsonType": "string",
-                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')"
+                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')" # todo: there are conflicts in the doc with 'First Year' vs 'Freshman'
                 },
                 "grad_year": {
                     "bsonType": "int",
@@ -104,7 +105,7 @@ collections: dict[str, CollectionProps] = {
                     "bsonType": "array",
                     "description": "Must include math courses taken as a array using a string value for each course"
                 },
-                "program_expectations": {
+                "program_expectation": {
                     "bsonType": "string",
                     "description": "Must include what student hopes to get out of the program as a string value"
                 },
