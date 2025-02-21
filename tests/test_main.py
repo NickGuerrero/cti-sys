@@ -9,9 +9,9 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
-from src.app.models.mongo.models import ApplicationModel
+from src.app.models.mongo.models import ApplicationModel, DeepWork
 from src.app.models.mongo.schemas import init_collections
-from src.config import APPLICATIONS_COLLECTION, MONGO_DATABASE_NAME
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, MONGO_DATABASE_NAME, PATHWAY_GOALS_COLLECTION
 from src.db_scripts.mongo import get_mongo
 from src.main import app
 
@@ -174,4 +174,52 @@ class TestCreateApplication:
                 "lname": "Last",
                 "email": "test.user@cti.com"
                 # missing app_submitted
+            })
+
+class TestAccelerateFlex:
+    @pytest.mark.integration
+    def test_accelerate_flex_schema_rejects_invalid_insert(self, real_mongo_db: pymongo.database.Database):
+        """Integration test validating that an accelerate_flex document will not be inserted
+        if it does not follow the collection json validation schema.
+        
+        Relevant for inserts performed outside of API.
+        """
+        accelerate_flex_collection = real_mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION)
+
+        with pytest.raises(pymongo.errors.WriteError, match="Document failed validation"):
+            accelerate_flex_collection.insert_one({
+                # missing "cti_id": 12345,
+                "selected_deep_work": DeepWork(
+                    day="Monday",
+                    time="2pm - 4pm",
+                    sprint="Spring 2024"
+                ).model_dump(),
+                "academic_goals": ["Bachelor's Degree", "Associate's Degree"],
+                "phone": "(800) 123-4567",
+                "academic_year": "Sophomore",
+                "grad_year": 2027,
+                "summers_left": 2,
+                "cs_exp": False,
+                "cs_courses": ["Data Structures", "Algorithms"],
+                "math_courses": ["Calculus 1A", "Discrete Math"],
+                "program_expectation": "Summer tech internship",
+                "career_outlook": "Graduated and in the workforce",
+                "heard_about": "Instructor/Professor",
+            })
+
+class TestPathwayGoals:
+    @pytest.mark.integration
+    def test_pathway_goals_schema_rejects_invalid_insert(self, real_mongo_db: pymongo.database.Database):
+        """Integration test validating that an pathway_goals document will not be inserted
+        if it does not follow the collection json validation schema.
+        
+        Relevant for inserts performed outside of API.
+        """
+        pathway_goals_collection = real_mongo_db.get_collection(PATHWAY_GOALS_COLLECTION)
+
+        with pytest.raises(pymongo.errors.WriteError, match="Document failed validation"):
+            pathway_goals_collection.insert_one({
+                "pathway_goal": "Summer Tech Internship 2025",
+                "pathway_desc": "Obtain a summer tech internship for 2025",
+                "course_req": "101A" # needs to be an array of strings
             })

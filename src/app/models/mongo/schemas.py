@@ -49,7 +49,7 @@ collections: dict[str, CollectionProps] = {
             "bsonType": "object",
             "title": "Accelerate Flex Object Validation",
             # todo: which of these are actually going to be required?
-            "required": ["cti_id", "selected_deep_work", "academic_goals", "phone", "academic_year", "grad_year", "summers_left", "cs_exp", "cs_courses", "math_courses", "program_expectations", "career_outlook", "heard_about"],
+            "required": ["cti_id", "selected_deep_work", "academic_goals", "phone", "academic_year", "grad_year", "summers_left", "cs_exp", "cs_courses", "math_courses", "program_expectation", "career_outlook", "heard_about"],
             "properties": {
                 "cti_id": {
                     "bsonType": "int",
