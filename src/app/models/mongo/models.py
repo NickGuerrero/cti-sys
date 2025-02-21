@@ -25,3 +25,19 @@ class DeepWork(BaseModel):
     day: str = Field(description="")
     time: str = Field(description="")
     sprint: str = Field(description="")
+    
+class AccelerateFlex(BaseModel):
+    # define all required fields
+    cit_id: int
+    selected_deep_work: list[DeepWork]
+    academic_goals: int
+    phone: str
+    academic_year: str
+    
+    
+	# define configuration options -> extra allowed
+    pass
+
+class PathwayGoals(BaseModel):
+    # define all required fields
+    pass
