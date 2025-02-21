@@ -281,7 +281,7 @@ class TestPathwayGoals:
 
         assert insert_result.acknowledged
 
-        found_accelerate_flex = pathway_goals_collection.find_one({"_id": insert_result.inserted_id})
-        assert found_accelerate_flex is not None
-        assert found_accelerate_flex["pathway_goal"] == pathway_goal
+        found_pathway_goals = pathway_goals_collection.find_one({"_id": insert_result.inserted_id})
+        assert found_pathway_goals is not None
+        assert found_pathway_goals["pathway_goal"] == pathway_goal
         assert prev_count + 1 == pathway_goals_collection.count_documents({})
