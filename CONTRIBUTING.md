@@ -2,7 +2,7 @@
 
 # Introduction
 
-Thanks for your interest in our project. Contribution
+Thanks for your interest in our project. Contribution is generally done by our internal development team. As an open source project, you're allowed to download and use the project as you wish, but you can contact the repository owner in you're interested in contributing.
 
 ## Code Style
 These rules are not all-encompassing, new rules may be created as more code is reviewed. However, here's a general set of coding styling and practices that are recommended when writing code for this project. I've based it off the PEP 8 styling guide, which has more in-depth recommendations (https://peps.python.org/pep-0008/).
