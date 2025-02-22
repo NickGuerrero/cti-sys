@@ -48,8 +48,7 @@ collections: dict[str, CollectionProps] = {
         schema={
             "bsonType": "object",
             "title": "Accelerate Flex Object Validation",
-            # todo: which of these are actually going to be required?
-            "required": ["cti_id", "selected_deep_work", "academic_goals", "phone", "academic_year", "grad_year", "summers_left", "cs_exp", "cs_courses", "math_courses", "program_expectation", "career_outlook", "heard_about"],
+            "required": ["cti_id"],
             "properties": {
                 "cti_id": {
                     "bsonType": "int",
@@ -68,7 +67,7 @@ collections: dict[str, CollectionProps] = {
                             "description": "Must include the start and end time of the deepwork session as a string value (ex: '2pm - 4pm')"
                         },
                         "sprint": {
-                            "bsonType": "string", # todo: format required for this?
+                            "bsonType": "string",
                             "description": "Must include the sprint this deepwork session is associated with"
                         }
                     }
@@ -78,12 +77,12 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include academic goals as an array of string values"
                 },
                 "phone": {
-                    "bsonType": "string", # todo: is there a format/match restriction?
+                    "bsonType": "string",
                     "description": "Must include phone number of student as a string value"
                 },
                 "academic_year": {
                     "bsonType": "string",
-                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')" # todo: there are conflicts in the doc with 'First Year' vs 'Freshman'
+                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')"
                 },
                 "grad_year": {
                     "bsonType": "int",
@@ -121,7 +120,7 @@ collections: dict[str, CollectionProps] = {
             "additionalProperties": True
         },
         indexes=[
-            # todo: do we have any index fields? avoiding duplicates on cti_id?
+            IndexModel("cti_id", unique=True)
         ]
     ),
     PATHWAY_GOALS_COLLECTION: CollectionProps(
@@ -177,7 +176,6 @@ collections: dict[str, CollectionProps] = {
             }
         },
         indexes=[
-            # todo: don't see becoming large & cannot be unique on course_id alone, indexing not justified
         ]
     )
 }
