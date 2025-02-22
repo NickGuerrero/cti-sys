@@ -127,7 +127,7 @@ collections: dict[str, CollectionProps] = {
         schema={
             "bsonType": "object",
             "title": "Pathway Goals Object Validation",
-            "required": ["pathway_goal", "pathway_desc", "course_req"],
+            "required": ["pathway_goal"],
             "properties": {
                 "pathway_goal": {
                     "bsonType": "string",

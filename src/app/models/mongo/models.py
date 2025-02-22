@@ -48,8 +48,10 @@ class AccelerateFlexModel(AccelerateFlexBase):
 
 class PathwayGoalBase(BaseModel):
     pathway_goal: str = Field(description="Name for the pathway goal")
-    pathway_desc: str = Field(description="Description of the pathway goal")
-    course_req: str = Field(description="Courses required for the pathway goal")
+    pathway_desc: Optional[str] = Field(default=None, description="Description of the pathway goal")
+    course_req: Optional[List[str]] = Field(default=None, description="Courses required for the pathway goal")
+
+    model_config = ConfigDict(extra="forbid")
 
 class PathwayGoalModel(PathwayGoalBase):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
@@ -60,6 +62,8 @@ class CourseBase(BaseModel):
     title: Optional[str] = Field(default=None, description="Title of the course")
     milestones: Optional[List[int]] = Field(default=None, description="List of the number of assignments required for each milestone")
     version: Optional[str] = Field(default=None, description="Version number of the course")
+
+    model_config = ConfigDict(extra="forbid")
 
 class CourseModel(CourseBase):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
