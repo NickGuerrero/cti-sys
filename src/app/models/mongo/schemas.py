@@ -140,7 +140,7 @@ collections: dict[str, CollectionProps] = {
                 },
                 "course_req": {
                     "bsonType": "array",
-                    "description": "Must include the course requirements of the pathway goal as an array of string values"
+                    "description": "Must include the course requirements as 'courses' collection course_id values of the pathway goal as an array of string values"
                 },
             }
         },
