@@ -2,7 +2,7 @@ from typing import Any, Dict, Sequence
 from pymongo import IndexModel
 from pymongo.database import Database
 
-from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, PATHWAY_GOALS_COLLECTION
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
 
 class CollectionProps:
     def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
@@ -146,6 +146,38 @@ collections: dict[str, CollectionProps] = {
         },
         indexes=[
             IndexModel("pathway_goal", unique=True)
+        ]
+    ),
+    COURSES_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Courses Object Validation",
+            "required": ["course_id"],
+            "properties": {
+                "course_id": {
+                    "bsonType": "string",
+                    "description": "Must include the name/codeword of the course as a string value"
+                },
+                "canvas_id": {
+                    "bsonType": "int",
+                    "description": "Must include the course's id on canvas as an integer value"
+                },
+                "title": {
+                    "bsonType": "string",
+                    "description": "Must include the course title as a string value"
+                },
+                "milestones": {
+                    "bsonType": "array",
+                    "description": "Must include the number of assignments to complete each milestone ([1 - n]) as an integer array value"
+                },
+                "version": {
+                    "bsonType": "string",
+                    "description": "Must include the version number for this course as a string value"
+                },
+            }
+        },
+        indexes=[
+            # todo: don't see becoming large & cannot be unique on course_id alone, indexing not justified
         ]
     )
 }
