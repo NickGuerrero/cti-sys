@@ -55,7 +55,7 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include the ID derived from Postgres database's Student table PK as an integer value"
                 },
                 "selected_deep_work": {
-                    "bsonType": "object",
+                    "bsonType": ["object", "null"],
                     "required": ["day", "time", "sprint"],
                     "properties": {
                         "day": {
@@ -73,47 +73,47 @@ collections: dict[str, CollectionProps] = {
                     }
                 },
                 "academic_goals": {
-                    "bsonType": "array",
+                    "bsonType": ["array", "null"],
                     "description": "Must include academic goals as an array of string values"
                 },
                 "phone": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include phone number of student as a string value"
                 },
                 "academic_year": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')"
                 },
                 "grad_year": {
-                    "bsonType": "int",
+                    "bsonType": ["int", "null"],
                     "description": "Must include expected graduation year as an integer value"
                 },
                 "summers_left": {
-                    "bsonType": "int",
+                    "bsonType": ["int", "null"],
                     "description": "Must include number of summers remaining before graduation as an integer value"
                 },
                 "cs_exp": {
-                    "bsonType": "bool",
+                    "bsonType": ["bool", "null"],
                     "description": "Must include whether a CS course has been taken before as a boolean value"
                 },
                 "cs_courses": {
-                    "bsonType": "array",
+                    "bsonType": ["array", "null"],
                     "description": "Must include CS courses taken as a array using a string value for each course"
                 },
                 "math_courses": {
-                    "bsonType": "array",
+                    "bsonType": ["array", "null"],
                     "description": "Must include math courses taken as a array using a string value for each course"
                 },
                 "program_expectation": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include what student hopes to get out of the program as a string value"
                 },
                 "career_outlook": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include where student sees themselves in 2-4 years as a string value"
                 },
                 "heard_about": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include how student heard about Accelerate as a string value"
                 },
             },
@@ -134,11 +134,11 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include the pathway goal as a string value (ex: 'Summer Tech Internship 2025')"
                 },
                 "pathway_desc": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include the pathway goal description as a string value (ex: 'Obtain a summer tech internship for 2025')"
                 },
                 "course_req": {
-                    "bsonType": "array",
+                    "bsonType": ["array", "null"],
                     "description": "Must include the course requirements as 'courses' collection course_id values of the pathway goal as an array of string values"
                 },
             }
@@ -158,19 +158,19 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include the name/codeword of the course as a string value"
                 },
                 "canvas_id": {
-                    "bsonType": "int",
+                    "bsonType": ["int", "null"],
                     "description": "Must include the course's id on canvas as an integer value"
                 },
                 "title": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include the course title as a string value"
                 },
                 "milestones": {
-                    "bsonType": "array",
+                    "bsonType": ["array", "null"],
                     "description": "Must include the number of assignments to complete each milestone ([1 - n]) as an integer array value"
                 },
                 "version": {
-                    "bsonType": "string",
+                    "bsonType": ["string", "null"],
                     "description": "Must include the version number for this course as a string value"
                 },
             }
