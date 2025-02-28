@@ -1,19 +1,27 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
+from typing import List, Optional
+from datetime import datetime, date
+
 
 class ORMSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+class StudentEmailSchema(ORMSchema):
+    email: EmailStr
+    is_primary: bool
+
 class StudentSchema(ORMSchema):
     cti_id: int
     fname: str
-    pname: str
+    pname: Optional[str] = None
     lname: str
-    join_date: str # TODO Validate date
+    join_date: datetime
     target_year: int
-    gender: str
-    first_gen: bool
-    institution: str
-    is_graduate: bool
-    birthday: str # TODO Validate date
+    gender: Optional[str] = None
+    first_gen: Optional[bool] = None
+    institution: Optional[str] = None
+    is_graduate: Optional[bool] = False
+    birthday: Optional[date] = None
     active: bool
     cohort_lc: bool
+    email_addresses: List[StudentEmailSchema]
