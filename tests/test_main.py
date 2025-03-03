@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import bson
 import pymongo
@@ -9,11 +9,13 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
 from src.app.models.mongo.models import ApplicationModel
 from src.app.models.mongo.schemas import init_collections
+from src.app.models.postgres.models import Student, Attendance, StudentAttendance, AccelerateCourseProgress
 from src.config import APPLICATIONS_COLLECTION, MONGO_DATABASE_NAME
 from src.db_scripts.mongo import get_mongo
-from src.main import app
+from src.main import app, check_student_activity, CheckActivityRequest, CheckActivityResponse
 
 client = TestClient(app)
 
@@ -175,3 +177,92 @@ class TestCreateApplication:
                 "email": "test.user@cti.com"
                 # missing app_submitted
             })
+class TestCheckActivity:
+    @patch('src.main.make_session')
+    def test_check_activity_active(self, mock_make_session):
+        mock_db = MagicMock()
+        mock_make_session.return_value = mock_db
+
+
+        mock_student_active = Student(cti_id=1, fname="John", lname = "Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname = "Doe", active=False)
+
+        mock_db.query().filter().all.side_effect = [
+            [mock_student_active],
+            [mock_student_inactive],
+            [mock_student_active, mock_student_inactive]
+        ]
+
+        request_data = {
+            "target": "active",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+
+    
+    @patch('src.main.make_session')
+    def test_check_activity_inactive(self, mock_make_session):
+        mock_db = MagicMock()
+        mock_make_session.return_value = mock_db
+
+        mock_db.commit = MagicMock()
+
+        mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
+
+        mock_db.query().filter().all.side_effect = [
+            [mock_student_active],
+            [mock_student_inactive],
+            [mock_student_active, mock_student_inactive]
+        ]
+
+        request_data = {
+            "target": "inactive",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+        
+
+    @patch('src.main.make_session')
+    def test_check_activity_both(self, mock_make_session):
+        mock_db = MagicMock()
+        mock_make_session.return_value = mock_db
+        
+        mock_db.commit = MagicMock()
+
+        mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
+
+        mock_db.query().filter().all.side_effect = [
+            [mock_student_active],
+            [mock_student_inactive],
+            [mock_student_active, mock_student_inactive]
+        ]
+
+        request_data = {
+            "target": "both",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
