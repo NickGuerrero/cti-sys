@@ -44,8 +44,8 @@ def database_test(db: Session = Depends(make_session)):
     try:
         exists = db.query(Student).first()
         if exists:
-            return StudentSchema.model_validate(Student)
-            # return StudentSchema.model_validate(exists)
+            # return StudentSchema.model_validate(Student)
+            return StudentSchema.model_validate(exists)
         else:
             return {"message": "Database Accessible, but contains no data"}
     except SQLAlchemyError:
