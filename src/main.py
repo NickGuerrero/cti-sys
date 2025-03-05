@@ -7,13 +7,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from pymongo.database import Database
 
-from src.app.models.mongo.models import ApplicationCreate, ApplicationModel
+from src.application.schemas import ApplicationCreate, ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
-from src.db_scripts.mongo import close_mongo, get_mongo, init_mongo , ping_mongo
-
-from .app.database import make_session
-from .app.models.postgres.models import Student
-from .app.models.postgres.schemas import StudentSchema
+from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mongo
+from src.database.postgres.core import make_session
+from src.database.postgres.tmp_models import Student
+from src.database.postgres.tmp_schemas import StudentSchema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

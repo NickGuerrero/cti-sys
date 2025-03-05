@@ -1,7 +1,4 @@
-from pydantic import BaseModel, ConfigDict
-
-class ORMSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+from src.schemas import ORMSchema
 
 class StudentSchema(ORMSchema):
     cti_id: int
@@ -17,3 +14,4 @@ class StudentSchema(ORMSchema):
     birthday: str # TODO Validate date
     active: bool
     cohort_lc: bool
+    
