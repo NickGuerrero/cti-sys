@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List, Optional
 from ...database import Base
+from pydantic import BaseModel, EmailStr
+
 
 # TODO: Determine which back_populates are needed WIP
 # TODO: Get test data set-up, maybe a larger set WIP
@@ -149,3 +151,17 @@ class AccountabilityGroup(Base):
     group_name: Mapped[str] = mapped_column(String)
     student_accelerator: Mapped[str] = mapped_column(String)
     ag_students: Mapped[List["Accelerate"]] = relationship(back_populates="ag_record")
+
+
+##################################
+# Request models
+##################################
+
+# Alternate email request model
+class AlternateEmailRequest(BaseModel):
+    fname: str
+    lname: str
+    alt_emails: List[EmailStr] = []
+    primary_email: Optional[str] = None
+    remove_emails: List[EmailStr] = []
+    google_form_email: EmailStr

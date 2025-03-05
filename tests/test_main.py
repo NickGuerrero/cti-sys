@@ -14,6 +14,10 @@ from src.app.models.mongo.schemas import init_collections
 from src.config import APPLICATIONS_COLLECTION, MONGO_DATABASE_NAME
 from src.db_scripts.mongo import get_mongo
 from src.main import app
+from sqlalchemy.orm import Session
+from unittest.mock import MagicMock
+from src.app.database import make_session
+from src.app.models.postgres.models import Student, StudentEmail
 
 client = TestClient(app)
 
@@ -175,3 +179,191 @@ class TestCreateApplication:
                 "email": "test.user@cti.com"
                 # missing app_submitted
             })
+
+@pytest.fixture(scope="function")
+def mock_postgresql_db():
+    """Fixture to mock a PostgreSQL database session for testing."""
+    db = MagicMock(spec=Session)
+    app.dependency_overrides[make_session] = lambda: db
+    yield db
+    app.dependency_overrides.pop(make_session)
+
+class TestModifyAlternateEmails:
+    
+    def test_add_alternate_emails(self, mock_postgresql_db):
+        """Test adding alternate emails for a student."""
+        student_email = [StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)]
+        
+        # Mock database response for existing student email
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = student_email
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "alt_emails": ["newemail@email.com", "newemail2@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+    
+    def test_add_alternate_email_already_exists(self, mock_postgresql_db):
+        """Test adding an alternate email that already belongs to another student."""
+        student = Student(cti_id=1, fname="Nicolas", lname="Guerrero")
+        student_email = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
+        other_student_email = StudentEmail(email="someoneelse@email.com", cti_id=2, is_primary=True)
+
+        # Mock database responses for email checks
+        mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
+            student_email,
+            student, 
+            other_student_email,
+        ]
+
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [student_email]
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "alt_emails": ["someoneelse@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 403
+        assert "already associated with another student" in response.json().get("detail", "")
+
+    def test_set_existing_alternate_as_primary(self, mock_postgresql_db):
+        """Test setting an existing alternate email as the primary email."""
+        student_email = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
+        alt_email = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [
+            student_email,
+            alt_email,
+        ]
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "primary_email": "alt@email.com",
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 200
+
+    def test_add_alternate_and_set_as_primary(self, mock_postgresql_db):
+        """Test adding an alternate email and setting it as primary at the same time."""
+        student_email = [StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)]
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = student_email
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "alt_emails": ["newprimary@email.com"],
+            "primary_email": "newprimary@email.com",
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 200
+
+    def test_set_invalid_primary_email(self, mock_postgresql_db):
+        """Test setting an invalid email as primary (not associated with the student)."""
+        student_email = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
+        alt_email = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [
+            student_email,
+            alt_email,
+        ]
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "primary_email": "notregistered@email.com",
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 403
+        assert "Primary email must be an existing or newly added student email" in response.json()["detail"]
+
+    def test_cannot_remove_primary_email(self, mock_postgresql_db):
+        """Test that attempting to remove the primary email results in an error."""
+        student_emails = [
+            StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True),
+            StudentEmail(email="alt@email.com", cti_id=1, is_primary=False),
+            StudentEmail(email="alt2@email.com", cti_id=1, is_primary=False)
+        ]
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = student_emails
+        mock_postgresql_db.query.return_value.filter.return_value.first.return_value = student_emails[0]
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "remove_emails": ["ngcti@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 403
+        assert "Cannot remove primary email" in response.json()["detail"]
+
+    def test_remove_alternate_email_success(self, mock_postgresql_db):
+        """Test successfully removing an alternate email."""
+        student_emails = [
+            StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True),
+            StudentEmail(email="alt@email.com", cti_id=1, is_primary=False),
+        ]
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = student_emails
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "remove_emails": ["alt@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+
+    def test_remove_nonexistent_alternate_email(self, mock_postgresql_db):
+        """Test removing an alternate email that does not exist in the student record."""
+        student_emails = [StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)]
+
+        # Mock database response for existing student emails
+        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = student_emails
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "Nicolas",
+            "lname": "Guerrero",
+            "remove_emails": ["notfound@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 400
+        assert "not found in student record" in response.json()["detail"]
+
+    def test_student_not_found(self, mock_postgresql_db):
+        """Test where the student is not found in the database."""
+        mock_postgresql_db.query.return_value.filter.return_value.first.return_value = None
+
+        response = client.post("/api/students/alternate-emails", json={
+            "fname": "John",
+            "lname": "Doe",
+            "alt_emails": ["newalt@email.com"],
+            "google_form_email": "ngcti@email.com"
+        })
+
+        assert response.status_code == 404
+        assert "Student not found" in response.json()["detail"]
+
+    def test_empty_request_validation_fail(self, mock_postgresql_db):
+        """Test that an empty request body fails validation."""
+        response = client.post("/api/students/alternate-emails", json={})
+        assert response.status_code == 422
