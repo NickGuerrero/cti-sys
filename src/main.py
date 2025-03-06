@@ -21,10 +21,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-api = FastAPI(
-    root_path="/api"
-)
-
 @app.get("/")
 def read_root():
     return {"message": "cti-sys v1.0.0"}
@@ -57,5 +53,4 @@ def mongo_test(db: Database = Depends(get_mongo)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error accessing MongoDB: {str(e)}")
     
-api.include_router(api_router)
-app.mount(path="/api", app=api)
+app.include_router(api_router, prefix="/api")
