@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import os
 import bson
 from pydantic import ValidationError
 import pymongo
@@ -9,9 +10,10 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
-
 from src.application.schemas import ApplicationModel
-from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, MONGO_DATABASE_NAME, PATHWAY_GOALS_COLLECTION
+from src.database.mongo.core import get_mongo
+from src.database.mongo.services import init_collections
 from src.database.mongo.tmp_schemas import AccelerateFlexBase, CourseBase, DeepWork, PathwayGoalBase
 from src.main import app
 
