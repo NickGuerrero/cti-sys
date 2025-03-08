@@ -2,7 +2,7 @@ from typing import Any, Dict, Sequence
 from pymongo import IndexModel
 from pymongo.database import Database
 
-from src.config import APPLICATIONS_COLLECTION
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
 
 class CollectionProps:
     def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
@@ -42,6 +42,140 @@ collections: dict[str, CollectionProps] = {
         },
         indexes=[
             IndexModel("email", unique=True)
+        ]
+    ),
+    ACCELERATE_FLEX_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Accelerate Flex Object Validation",
+            "required": ["cti_id"],
+            "properties": {
+                "cti_id": {
+                    "bsonType": "int",
+                    "description": "Must include the ID derived from Postgres database's Student table PK as an integer value"
+                },
+                "selected_deep_work": {
+                    "bsonType": ["object", "null"],
+                    "required": ["day", "time", "sprint"],
+                    "properties": {
+                        "day": {
+                            "bsonType": "string",
+                            "description": "Must include the weekday of the deepwork session as a string value"
+                        },
+                        "time": {
+                            "bsonType": "string",
+                            "description": "Must include the start and end time of the deepwork session as a string value (ex: '2pm - 4pm')"
+                        },
+                        "sprint": {
+                            "bsonType": "string",
+                            "description": "Must include the sprint this deepwork session is associated with"
+                        }
+                    }
+                },
+                "academic_goals": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include academic goals as an array of string values"
+                },
+                "phone": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include phone number of student as a string value"
+                },
+                "academic_year": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')"
+                },
+                "grad_year": {
+                    "bsonType": ["int", "null"],
+                    "description": "Must include expected graduation year as an integer value"
+                },
+                "summers_left": {
+                    "bsonType": ["int", "null"],
+                    "description": "Must include number of summers remaining before graduation as an integer value"
+                },
+                "cs_exp": {
+                    "bsonType": ["bool", "null"],
+                    "description": "Must include whether a CS course has been taken before as a boolean value"
+                },
+                "cs_courses": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include CS courses taken as a array using a string value for each course"
+                },
+                "math_courses": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include math courses taken as a array using a string value for each course"
+                },
+                "program_expectation": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include what student hopes to get out of the program as a string value"
+                },
+                "career_outlook": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include where student sees themselves in 2-4 years as a string value"
+                },
+                "heard_about": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include how student heard about Accelerate as a string value"
+                },
+            },
+            "additionalProperties": True
+        },
+        indexes=[
+            IndexModel("cti_id", unique=True)
+        ]
+    ),
+    PATHWAY_GOALS_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Pathway Goals Object Validation",
+            "required": ["pathway_goal"],
+            "properties": {
+                "pathway_goal": {
+                    "bsonType": "string",
+                    "description": "Must include the pathway goal as a string value (ex: 'Summer Tech Internship 2025')"
+                },
+                "pathway_desc": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the pathway goal description as a string value (ex: 'Obtain a summer tech internship for 2025')"
+                },
+                "course_req": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include the course requirements as 'courses' collection course_id values of the pathway goal as an array of string values"
+                },
+            }
+        },
+        indexes=[
+            IndexModel("pathway_goal", unique=True)
+        ]
+    ),
+    COURSES_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Courses Object Validation",
+            "required": ["course_id"],
+            "properties": {
+                "course_id": {
+                    "bsonType": "string",
+                    "description": "Must include the name/codeword of the course as a string value"
+                },
+                "canvas_id": {
+                    "bsonType": ["int", "null"],
+                    "description": "Must include the course's id on canvas as an integer value"
+                },
+                "title": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the course title as a string value"
+                },
+                "milestones": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include the number of assignments to complete each milestone ([1 - n]) as an integer array value"
+                },
+                "version": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the version number for this course as a string value"
+                },
+            }
+        },
+        indexes=[
         ]
     )
 }
