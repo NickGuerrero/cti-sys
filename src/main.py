@@ -114,7 +114,7 @@ def modify_alternate_emails(
     db: Session = Depends(make_session),
 ):
     try:
-        # Normalize all emails to lowercase
+        # Normalize all emails to lowercase and strip whitespace
         google_form_email = request.google_form_email.strip().lower()
         request_primary_email = request.primary_email.strip().lower() if request.primary_email else None
         request.alt_emails = [email.strip().lower() for email in request.alt_emails]
@@ -133,65 +133,80 @@ def modify_alternate_emails(
         if not student:
             raise HTTPException(status_code=404, detail="Student not found")
 
-        # Fetch all student emails
+        # Fetch all student emails and normalize to lowercase for comparisons
         student_emails = db.query(StudentEmail).filter(StudentEmail.cti_id == student.cti_id).all()
         student_email_dict = {email.email.lower(): email for email in student_emails} 
         student_email_list = set(student_email_dict.keys())
-
-        # Ensure new alternate emails do not belong to another student
-        for email_lower in request.alt_emails:
-            email_owner = db.query(StudentEmail).filter(func.lower(StudentEmail.email) == email_lower).first()
-            if email_owner and email_owner.cti_id != student.cti_id:
+        
+        # Ensure primary email change authentication
+        if request_primary_email:
+            # If changing primary email, it must match the Google form email
+            if request_primary_email != google_form_email:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Email '{email_lower}' is already associated with another student"
+                    detail="Primary email must match the email used to submit the form"
                 )
 
         # Handle email removal
         for email_lower in request.remove_emails:
             if email_lower not in student_email_list:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot remove email: {email_lower} not found in student record"
-                )
-            
-            # Prevent removal of primary email
-            if student_email_dict[email_lower].is_primary:
+                continue 
+
+            # Prevent removal of primary email unless a new primary is specified
+            if student_email_dict[email_lower].is_primary and not request_primary_email:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Cannot remove primary email: {email_lower}"
+                    detail=f"Cannot remove primary email: {email_lower} without specifying a new primary email"
                 )
 
+            # Delete the email
             db.query(StudentEmail).filter(
                 StudentEmail.cti_id == student.cti_id,
                 func.lower(StudentEmail.email) == email_lower
             ).delete()
             student_email_list.remove(email_lower)
 
-        # Add new alternate emails
+        # Ensure new alternate emails do not belong to another student
         for email_lower in request.alt_emails:
+            if email_lower in request.remove_emails:
+                continue
+                
             if email_lower not in student_email_list:
+                # Check if email belongs to another student
+                email_owner = db.query(StudentEmail).filter(
+                    func.lower(StudentEmail.email) == email_lower
+                ).first()
+                
+                if email_owner and email_owner.cti_id != student.cti_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Email '{email_lower}' is already associated with another student"
+                    )
+                    
+                # Add new email
                 new_email = StudentEmail(email=email_lower, cti_id=student.cti_id, is_primary=False)
                 db.add(new_email)
                 student_email_list.add(email_lower)
 
         # Handle primary email update
         if request_primary_email:
-            new_primary_email = student_email_dict.get(request_primary_email)
-            if not new_primary_email and request_primary_email in request.alt_emails:
-                new_primary_email = StudentEmail(email=request_primary_email, cti_id=student.cti_id, is_primary=False)
-                db.add(new_primary_email)
-                db.commit()
-                db.refresh(new_primary_email)
-                student_email_dict[request_primary_email] = new_primary_email
-            if request_primary_email not in student_email_dict:
-                raise HTTPException(status_code=403, detail="Primary email must be an existing or newly added student email")
             db.query(StudentEmail).filter(StudentEmail.cti_id == student.cti_id).update({"is_primary": False})
-            student_email_dict[request_primary_email].is_primary = True
+            
+            # Set the requested email as primary
+            db.query(StudentEmail).filter(
+                StudentEmail.cti_id == student.cti_id,
+                func.lower(StudentEmail.email) == request_primary_email
+            ).update({"is_primary": True})
 
         db.commit()
         return {"status": 200}
-
+    
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except HTTPException as http_exc:
+        db.rollback()
+        raise http_exc
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
