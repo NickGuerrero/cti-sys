@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from pymongo.database import Database
-from src.application.schemas import ApplicationCreate, ApplicationModel
+from src.applications.schemas import ApplicationCreate, ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
 
 def create(*, application: ApplicationCreate, db: Database) -> ApplicationModel:

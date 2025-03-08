@@ -8,7 +8,7 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
-from src.application.schemas import ApplicationModel
+from src.applications.schemas import ApplicationModel
 from src.database.mongo.tmp_schemas import AccelerateFlexBase, CourseBase, DeepWork, PathwayGoalBase
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
 from src.main import app

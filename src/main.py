@@ -8,7 +8,7 @@ from pymongo.database import Database
 from src.api import api_router
 from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mongo
 from src.database.postgres.core import make_session
-from src.database.postgres.tmp_models import Student
+from src.database.postgres.models import Student
 from src.database.postgres.tmp_schemas import StudentSchema
 
 @asynccontextmanager
