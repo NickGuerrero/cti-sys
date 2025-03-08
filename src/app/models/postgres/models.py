@@ -159,8 +159,6 @@ class AccountabilityGroup(Base):
 
 # Alternate email request model
 class AlternateEmailRequest(BaseModel):
-    fname: str
-    lname: str
     alt_emails: List[EmailStr] = []
     primary_email: Optional[str] = None
     remove_emails: List[EmailStr] = []
