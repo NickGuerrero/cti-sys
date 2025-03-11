@@ -1,5 +1,4 @@
-from src.app.database import engine, Base
-from src.app.models.postgres.models import *
+from src.database.postgres.core import *
 
 # Create database from the current model set-up
 # Use alembic scripts to upgrade between deployment TODO

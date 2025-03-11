@@ -8,13 +8,12 @@ from sqlalchemy import text
 from pymongo.database import Database
 from sqlalchemy import func
 
-from src.app.models.mongo.models import ApplicationCreate, ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
-from src.db_scripts.mongo import close_mongo, get_mongo, init_mongo , ping_mongo
-
-from .app.database import make_session
-from .app.models.postgres.models import Student, StudentEmail, AlternateEmailRequest
-from .app.models.postgres.schemas import StudentSchema
+from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mongo
+from src.database.mongo.tmp_schemas import ApplicationCreate, ApplicationModel
+from src.database.postgres.core import make_session
+from src.database.postgres.models import AlternateEmailRequest, Student, StudentEmail
+from src.database.postgres.tmp_schemas import StudentSchema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -210,3 +209,4 @@ def modify_alternate_emails(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    

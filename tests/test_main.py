@@ -10,15 +10,15 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
-from src.app.models.mongo.models import AccelerateFlexBase, ApplicationModel, CourseBase, DeepWork, PathwayGoalBase
-from src.app.models.mongo.schemas import init_collections
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, MONGO_DATABASE_NAME, PATHWAY_GOALS_COLLECTION
-from src.db_scripts.mongo import get_mongo
+from src.database.mongo.core import get_mongo
+from src.database.mongo.services import init_collections
+from src.database.mongo.tmp_schemas import AccelerateFlexBase, ApplicationModel, CourseBase, DeepWork, PathwayGoalBase
+from src.database.postgres.core import make_session
+from src.database.postgres.models import Student, StudentEmail
 from src.main import app
 from sqlalchemy.orm import Session
 from unittest.mock import MagicMock
-from src.app.database import make_session
-from src.app.models.postgres.models import Student, StudentEmail
 from sqlalchemy.exc import SQLAlchemyError
 
 

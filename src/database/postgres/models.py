@@ -1,12 +1,13 @@
 from sqlalchemy import (
     Integer, String, Date, Boolean, DateTime, Float,
-    ForeignKey, ForeignKeyConstraint, func, Index
+    ForeignKey, func, Index
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List, Optional
-from ...database import Base
 from pydantic import BaseModel, EmailStr
+
+from src.database.postgres.core import Base
 
 
 # TODO: Determine which back_populates are needed WIP
