@@ -1,7 +1,7 @@
 import os
 from unittest.mock import MagicMock
-import mongomock
-import pymongo
+from mongomock import MongoClient as MockClient
+from pymongo import MongoClient
 import pytest
 from sqlalchemy.orm import Session
 
@@ -14,7 +14,7 @@ from src.main import app
 @pytest.fixture(scope="function")
 def mock_mongo_db():
     """Injection for MongoDB dependency intended for fast, in-memory unit testing"""
-    mock_client = mongomock.MongoClient()
+    mock_client = MockClient()
     db = mock_client[MONGO_DATABASE_NAME]
 
     # Apply indexes (json schema validators cannot be enforced in mongomock)
@@ -32,7 +32,7 @@ def mock_mongo_db():
 def real_mongo_db():
     """Injection for MongoDB dependency intended for wide scope, accurate integration testing"""
     # Consider replacing this with a conditionally created local instance (in GitHub Actions)
-    client = pymongo.MongoClient(os.environ.get("CTI_MONGO_URL"))
+    client = MongoClient(os.environ.get("CTI_MONGO_URL"))
     test_db_name = "test_" + MONGO_DATABASE_NAME
     db = client[test_db_name]
     init_collections(db, with_validators=True)
