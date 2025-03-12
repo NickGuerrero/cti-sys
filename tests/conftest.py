@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.config import MONGO_DATABASE_NAME
 from src.database.mongo.core import get_mongo
-from src.database.mongo.services import init_collections
+from src.database.mongo.service import init_collections
 from src.database.postgres.core import make_session
 from src.main import app
 

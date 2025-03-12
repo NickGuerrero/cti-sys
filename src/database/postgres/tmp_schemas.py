@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, date
 
-
+# todo: "schemas" here defined only for confirmation of DB functionality in main.py, remove if not needed
 class ORMSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

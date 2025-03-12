@@ -2,7 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.database.postgres.models import AlternateEmailRequest, Student, StudentEmail
+from src.database.postgres.models import Student, StudentEmail
+from src.students.alternate_emails.schemas import AlternateEmailRequest
 
 def modify(*, request: AlternateEmailRequest, db: Session) -> None:
     # Normalize all emails to lowercase and strip whitespace

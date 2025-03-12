@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.database.postgres.core import make_session
-from src.database.postgres.models import AlternateEmailRequest
+from src.students.alternate_emails.schemas import AlternateEmailRequest
 from src.students.alternate_emails.service import modify
 
 router = APIRouter()

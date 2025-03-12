@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from mongomock import DuplicateKeyError
 from pymongo.database import Database
 
+from src.applications.models import ApplicationModel
+from src.applications.schemas import ApplicationCreateRequest
 from src.applications.service import create
 from src.database.mongo.core import get_mongo
-from src.database.mongo.tmp_schemas import ApplicationCreate, ApplicationModel
 
 router = APIRouter()
 
@@ -24,7 +25,7 @@ router = APIRouter()
     },
 )
 def create_application(
-    application_create: ApplicationCreate,
+    application_create: ApplicationCreateRequest,
     db: Database = Depends(get_mongo),
 ):
     try:

@@ -1,15 +1,16 @@
 from datetime import datetime, timezone
 from pymongo.database import Database
 
+from src.applications.models import ApplicationModel
+from src.applications.schemas import ApplicationCreateRequest
 from src.config import APPLICATIONS_COLLECTION
-from src.database.mongo.tmp_schemas import ApplicationCreate, ApplicationModel
 
-def create(*, application_create: ApplicationCreate, db: Database) -> ApplicationModel:
+def create(*, application_create: ApplicationCreateRequest, db: Database) -> ApplicationModel:
     application_collection = db.get_collection(APPLICATIONS_COLLECTION)
 
     # validate that required model params are present
     # Pydantic catches and raises its own code 422 on a failed Model.model_validate() call
-    validated_app = ApplicationCreate.model_validate(application_create)
+    validated_app = ApplicationCreateRequest.model_validate(application_create)
 
     # add extra form attributes from application body data
     validated_with_extras = validated_app.model_dump()

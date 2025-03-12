@@ -9,11 +9,13 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
+from src.applications.models import ApplicationModel
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
-from src.database.mongo.tmp_schemas import AccelerateFlexBase, ApplicationModel, CourseBase, DeepWork, PathwayGoalBase
 from src.database.postgres.models import Student, StudentEmail
 from src.main import app
 from sqlalchemy.exc import SQLAlchemyError
+
+from src.reports.models import AccelerateFlexBase, CourseBase, DeepWork, PathwayGoalBase
 
 client = TestClient(app)
 

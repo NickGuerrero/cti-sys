@@ -5,7 +5,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
 
 from src.database.postgres.core import Base
 
@@ -152,15 +151,3 @@ class AccountabilityGroup(Base):
     group_name: Mapped[str] = mapped_column(String)
     student_accelerator: Mapped[str] = mapped_column(String)
     ag_students: Mapped[List["Accelerate"]] = relationship(back_populates="ag_record")
-
-
-##################################
-# Request models
-##################################
-
-# Alternate email request model
-class AlternateEmailRequest(BaseModel):
-    alt_emails: List[EmailStr] = []
-    primary_email: Optional[str] = None
-    remove_emails: List[EmailStr] = []
-    google_form_email: EmailStr
