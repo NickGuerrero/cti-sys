@@ -9,7 +9,7 @@ from src.api import api_router
 from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mongo
 from src.database.postgres.core import make_session
 from src.database.postgres.models import Student
-from src.database.postgres.tmp_schemas import StudentSchema
+from src.students.models import StudentDTO
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,7 +40,7 @@ def database_test(db: Session = Depends(make_session)):
         exists = db.query(Student).first()
         if exists:
             # return StudentSchema.model_validate(Student)
-            return StudentSchema.model_validate(exists)
+            return StudentDTO.model_validate(exists)
         else:
             return {"message": "Database Accessible, but contains no data"}
     except SQLAlchemyError:

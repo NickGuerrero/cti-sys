@@ -15,7 +15,7 @@ from src.database.postgres.models import Student, StudentEmail
 from src.main import app
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.reports.models import AccelerateFlexBase, CourseBase, DeepWork, PathwayGoalBase
+from src.reports.models import AccelerateFlexBase, CourseBase, DeepWorkModel, PathwayGoalBase
 
 client = TestClient(app)
 
@@ -198,7 +198,7 @@ class TestAccelerateFlex:
         with pytest.raises(pymongo.errors.WriteError, match="Document failed validation"):
             accelerate_flex_collection.insert_one({
                 # missing "cti_id": 12345,
-                "selected_deep_work": DeepWork(
+                "selected_deep_work": DeepWorkModel(
                     day="Monday",
                     time="2pm - 4pm",
                     sprint="Spring 2024"
@@ -228,7 +228,7 @@ class TestAccelerateFlex:
         # todo: upon a POST /api/accelerate-flex endpoint creation, this direct insert can be replaced with a TestClient call
         insert_result = accelerate_flex_collection.insert_one({
             "cti_id": cti_id,
-            "selected_deep_work": DeepWork(
+            "selected_deep_work": DeepWorkModel(
                 day="Monday",
                 time="2pm - 4pm",
                 sprint="Spring 2024"

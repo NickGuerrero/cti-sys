@@ -3,14 +3,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.models import PyObjectId
 
-class DeepWork(BaseModel):
+# mongo models...
+class DeepWorkModel(BaseModel):
     day: str = Field(description="Weekday of the deepwork session")
     time: str = Field(description="Times for start and end of the deepwork session")
     sprint: str = Field(description="Which sprint this deepwork session is associated with")
     
 class AccelerateFlexBase(BaseModel):
     cti_id: int = Field(description="ID for student across all db domains")
-    selected_deep_work: Optional[List[DeepWork]] = Field(default=None, description="Deepwork sessions selected for expected attendance")
+    selected_deep_work: Optional[List[DeepWorkModel]] = Field(default=None, description="Deepwork sessions selected for expected attendance")
     academic_goals: Optional[List[str]] = Field(default=None, description="Student's expected academic outcomes")
     phone: Optional[str] = Field(default=None, description="Student's phone number")
     academic_year: Optional[str] = Field(default=None, description="Applicant's year in school")
