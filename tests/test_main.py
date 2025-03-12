@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import bson
 from pydantic import ValidationError
@@ -10,16 +10,17 @@ import pymongo.mongo_client
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+from unittest.mock import MagicMock
+from sqlalchemy.exc import SQLAlchemyError
+
 from src.app.models.mongo.models import AccelerateFlexBase, ApplicationModel, CourseBase, DeepWork, PathwayGoalBase
 from src.app.models.mongo.schemas import init_collections
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, MONGO_DATABASE_NAME, PATHWAY_GOALS_COLLECTION
 from src.db_scripts.mongo import get_mongo
-from src.main import app
-from sqlalchemy.orm import Session
-from unittest.mock import MagicMock
+from src.main import app, check_student_activity, CheckActivityRequest, CheckActivityResponse
 from src.app.database import make_session
-from src.app.models.postgres.models import Student, StudentEmail
-from sqlalchemy.exc import SQLAlchemyError
+from src.app.models.postgres.models import Student, StudentEmail, Attendance, StudentAttendance, AccelerateCourseProgress
 
 
 client = TestClient(app)
@@ -680,3 +681,96 @@ class TestModifyAlternateEmails:
         response = client.post("/api/students/alternate-emails", json={})
         assert response.status_code == 422
         
+class TestCheckActivity:
+    
+    def test_check_activity_active(self, mock_postgresql_db):
+        """Test checking activity for active students."""
+        mock_db = mock_postgresql_db
+
+        mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
+
+        mock_db.query.return_value.filter.return_value.all.side_effect = [
+            [mock_student_active],
+            [mock_student_inactive],
+            [mock_student_active, mock_student_inactive]
+        ]
+
+        # Mock the count method to return an integer
+        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1
+
+        request_data = {
+            "target": "active",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+
+        mock_db.commit.assert_called_once()
+
+    def test_check_activity_inactive(self, mock_postgresql_db):
+        """Test checking activity for inactive students."""
+        mock_db = mock_postgresql_db
+
+        mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
+
+        mock_db.query.return_value.filter.return_value.all.side_effect = [
+            [mock_student_active],  # For active students
+            [mock_student_inactive],  # For inactive students
+            [mock_student_active, mock_student_inactive]  # For both
+        ]
+
+        # Mock the count method to return an integer
+        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1
+
+        request_data = {
+            "target": "inactive",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+        mock_db.commit.assert_called_once()
+
+    def test_check_activity_both(self, mock_postgresql_db):
+        """Test checking activity for both active and inactive students."""
+        mock_db = mock_postgresql_db
+
+        mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
+        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
+
+        mock_db.query.return_value.filter.return_value.all.side_effect = [
+            [mock_student_active],  # For active students
+            [mock_student_inactive],  # For inactive students
+            [mock_student_active, mock_student_inactive]  # For both
+        ]
+
+        # Mock the count method to return an integer
+        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1
+
+        request_data = {
+            "target": "both",
+            "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
+            "activity_thresholds": {
+                "last_attended_session": ["2024-07-04"],
+                "completed_courses": ["101", "101A"]
+            }
+        }
+
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": 200}
+        mock_db.commit.assert_called_once()
