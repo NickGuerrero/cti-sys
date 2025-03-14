@@ -114,7 +114,8 @@ Not every domain will require each of the following files. Define these as neede
 | ├── `router.py`       | Endpoint definitions under `"{url}/api/applications"`     |
 | ├── `schemas.py`      | Pydantic classes for request and response data validation       |
 | ├── `service.py`      | Business logic, CRUD operations (fewer dependencies)        |
-| └── `util.py`         | Utility functions used solely within the `applications` domain |
+| ├── `exceptions.py`   | Domain-specific exception definitions        |
+| └── `utils.py`        | Utility functions used solely within the `applications` domain |
 
 > **Note: PostgreSQL tables as defined through SQLAlchemy classes are only located at `src/database/postgres/models.py`. additional SQLAlchemy entities should not be defined within individual domain `models.py` files.**
 
