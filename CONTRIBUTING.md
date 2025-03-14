@@ -49,6 +49,86 @@ def my_func():
     return some_var
 ```
 
+## Project Structure
+
+### Endpoint & Domain-driven Organization
+
+The folder structure is driven by API endpoint paths and aggregate model(s) for each domain.
+| **Path**                     |
+|------------------------------|
+| `src/`                        |
+| ├── `applications/`           |
+| │   ├── `canvas_export/`   |
+| ├── `students/`               |
+| │   ├── `process_commitment/`   |
+| │   ├── `process_attendance_log/`   |
+| │   ├── `process_withdrawal/`   |
+| │   ├── `alternate_emails/`   |
+| │   ├── `check_activity/`   |
+| │   ├── `{id}/`  |
+| │   │   ├── `recover_attendance/`  |
+| │   │   ├── `mark_inactive/`  |
+| │   ├── `accelerate/`         |
+| │   │   ├── `process_attendance/`  |
+| │   │   ├── `process_canvas/`  |
+| │   │   ├── `update_time_commitment/`  |
+| │   │   ├── `assign_sa_all/`  |
+| ├── `system/`           |
+| │   ├── `clean_inactive_requests/`    |
+
+Endpoint paths used to define structure an domains:
+
+| Path                                | HTTP Method |
+|-------------------------------------|--------------|
+| **applications/**                   | POST       |
+| └── canvas-export                   | GET         |
+| **students/**                       |             |
+| ├── process-commitment              | POST        |
+| ├── process-attendance-log          | POST        |
+| ├── process-withdrawal              | POST        |
+| ├── alternate-emails                | POST        |
+| ├── check-activity                  | POST        |
+| ├── **{id}/**                       |             |
+| │   ├── recover-attendance          | POST        |
+| │   └── mark-inactive/key={pass}    | POST        |
+| └── **accelerate/**                 |             |
+|     ├── assign-sa                   | PUT         |
+|     ├── process-attendance          | POST        |
+|     ├── process-canvas              | POST        |
+|     ├── update-time-commitment      | PUT         |
+|     └── assign-sa-all               | PUT         |
+| **system/**                         |             |
+| └── clean-inactive-requests         | POST        |
+
+### Domain Content
+
+Not every domain will require each of the following files. Define these as needed.
+
+| **Path**             | **Description**                                           |
+|----------------------|-----------------------------------------------------------|
+| `applications/`       | **Domain**                                                |
+| ├── `canvas_export/`  | Sub-domain `"canvas-export"`                              |
+| ├── `config.py`       | Configuration file for the `applications` domain   |
+| ├── `constants.py`    | Constants definition file for the `applications` domain   |
+| ├── `exceptions.py`   | Domain-specific exception definitions        |
+| ├── `models.py`       | Pydantic classes for MongoDB documents or PostgreSQL DTOs   |
+| ├── `router.py`       | Endpoint definitions under `"{url}/api/applications"`     |
+| ├── `schemas.py`      | Pydantic classes for request and response data validation       |
+| ├── `service.py`      | Business logic, workflow functions and CRUD operations   |
+| └── `utils.py`        | Utility functions used solely within the `applications` domain |
+
+>**Note: PostgreSQL tables as defined through SQLAlchemy classes are only located at `src/database/postgres/models.py`. additional SQLAlchemy entities should not be defined within individual domain `models.py` files.**
+
+### Large Services
+
+Not all domains can be defined from the endpoint paths. A large, internally defined service, such as an emailing service, should reside in its own domain (e.g., `src/email/`). All models and schemas, routers, service functions, configuration, and related functionality specific to this aggregate should be located in this service's domain.
+
+### Testing
+
+* Testing file structure should closely mirror that of the `src` directory
+* Integration tests should be marked with `@pytest.mark.integration` and **not** run within GitHub Actions
+* Fixtures used for dependencies should be added to `conftest.py` and will not need to be manually imported to pytest files
+
 ## Repository Management
 
 ### Creating Issues

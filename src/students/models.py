@@ -2,15 +2,15 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, date
 
-
-class ORMSchema(BaseModel):
+# postgres models...
+class BaseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-class StudentEmailSchema(ORMSchema):
+class StudentEmailDTO(BaseDTO):
     email: EmailStr
     is_primary: bool
 
-class StudentSchema(ORMSchema):
+class StudentDTO(BaseDTO):
     cti_id: int
     fname: str
     pname: Optional[str] = None
@@ -24,4 +24,4 @@ class StudentSchema(ORMSchema):
     birthday: Optional[date] = None
     active: bool
     cohort_lc: bool
-    email_addresses: List[StudentEmailSchema]
+    email_addresses: List[StudentEmailDTO]
