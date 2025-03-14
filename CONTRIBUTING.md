@@ -108,20 +108,20 @@ Not every domain will require each of the following files. Define these as neede
 |----------------------|-----------------------------------------------------------|
 | `applications/`       | **Domain**                                                |
 | ├── `canvas_export/`  | Sub-domain `"canvas-export"`                              |
-| ├── `config.py`       | Configuration file for the `applications` domain          |
-| ├── `flows.py`        | Workflow functions that require multiple services and/or functions (more dependencies) |
-| ├── `models.py`       | Pydantic classes for MongoDB documents or *PostgreSQL DTOs   |
+| ├── `config.py`       | Configuration file for the `applications` domain   |
+| ├── `constants.py`    | Constants definition file for the `applications` domain   |
+| ├── `exceptions.py`   | Domain-specific exception definitions        |
+| ├── `models.py`       | Pydantic classes for MongoDB documents or PostgreSQL DTOs   |
 | ├── `router.py`       | Endpoint definitions under `"{url}/api/applications"`     |
 | ├── `schemas.py`      | Pydantic classes for request and response data validation       |
-| ├── `service.py`      | Business logic, CRUD operations (fewer dependencies)        |
-| ├── `exceptions.py`   | Domain-specific exception definitions        |
+| ├── `service.py`      | Business logic, workflow functions and CRUD operations   |
 | └── `utils.py`        | Utility functions used solely within the `applications` domain |
 
-> **Note: PostgreSQL tables as defined through SQLAlchemy classes are only located at `src/database/postgres/models.py`. additional SQLAlchemy entities should not be defined within individual domain `models.py` files.**
+>**Note: PostgreSQL tables as defined through SQLAlchemy classes are only located at `src/database/postgres/models.py`. additional SQLAlchemy entities should not be defined within individual domain `models.py` files.**
 
 ### Large Services
 
-Not all domains can be defined from the endpoint paths. A large, internally defined service, such as an emailing service, should reside in its own domain (e.g., `src/email`). All models and schemas, routers, service functions, configuration, and related functionality specific to this aggregate should be located in this service's domain.
+Not all domains can be defined from the endpoint paths. A large, internally defined service, such as an emailing service, should reside in its own domain (e.g., `src/email/`). All models and schemas, routers, service functions, configuration, and related functionality specific to this aggregate should be located in this service's domain.
 
 ### Testing
 
