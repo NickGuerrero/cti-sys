@@ -49,7 +49,7 @@ def my_func():
     return some_var
 ```
 
-## Project Folder Structure
+## Project Structure
 
 ### Endpoint & Domain-driven Organization
 
@@ -88,18 +88,18 @@ Endpoint paths used to define structure an domains:
 
 ### Domain Content
 
-Not every domain will require each of the following files. Define these abstractions as they are needed.
+Not every domain will require each of the following files. Define these as they are needed.
 
 | **Path**             | **Description**                                           |
 |----------------------|-----------------------------------------------------------|
 | `applications/`       | **Domain**                                                |
 | ├── `canvas_export/`  | Sub-domain `"canvas-export"`                              |
 | ├── `config.py`       | Configuration file for the `applications` domain          |
-| ├── `flows.py`        | Workflow functions that require multiple services, more dependencies |
+| ├── `flows.py`        | Workflow functions that require multiple services and/or functions (more dependencies) |
 | ├── `models.py`       | Pydantic classes for MongoDB documents or *Postgres DTOs   |
 | ├── `router.py`       | Endpoint definitions under `"{url}/api/applications"`     |
-| ├── `schemas.py`      | Pydantic classes for request and response validation       |
-| ├── `service.py`      | Business logic, CRUD operations, fewer dependencies        |
+| ├── `schemas.py`      | Pydantic classes for request and response data validation       |
+| ├── `service.py`      | Business logic, CRUD operations (fewer dependencies)        |
 | └── `util.py`         | Utility functions used solely within the `applications` domain |
 
 *PostgreSQL tables as defined through SQLAlchemy classes are **only** located at `src/database/postgres/models.py` and additional SQLAlchemy entities should **not** be defined within specific domain `models.py` files.
@@ -107,6 +107,12 @@ Not every domain will require each of the following files. Define these abstract
 ### Large Services
 
 Not all domains can be defined from the endpoint paths. A large, internally defined service, such as an emailing service, would be defined within its own domain (ex: `src/email`). All models and schemas, routers, service functions, configuration, and other functionality specific to this aggregate should be located in this service's domain.
+
+### Testing
+
+* Testing file structure should closely mirror that of the `src` directory
+* Integration tests should be marked with `@pytest.mark.integration` and not be run within GitHub Actions
+* Fixtures used for dependencies should be added to `conftest.py` and will not need to be manually imported to pytest files
 
 ## Repository Management
 
