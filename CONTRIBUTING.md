@@ -49,6 +49,65 @@ def my_func():
     return some_var
 ```
 
+## Project Folder Structure
+
+### Endpoint & Domain-driven Organization
+
+Folder structure is driven by the aggregate model(s) for each domain as well as the API endpoint paths. A shortened representation of the structure:
+| **Path**                     |
+|------------------------------|
+| `src/`                        |
+| ├── `applications/`           |
+| ├── `students/`               |
+| │   ├── `alternate_emails/`   |
+| │   ├── `accelerate/`         |
+| │   │   ├── `assign_sa_all/`  |
+
+Endpoint paths used to define structure an domains:
+| Path                                | HTTP Method |
+|-------------------------------------|--------------|
+| **applications/**                   | POST       |
+| └── canvas-export                   | GET         |
+| **students/**                       |             |
+| ├── process-commitment              | POST        |
+| ├── process-attendance-log          | POST        |
+| ├── process-withdrawal              | POST        |
+| ├── alternate-emails                | POST        |
+| ├── check-activity                  | POST        |
+| ├── **{id}/**                       |             |
+| │   ├── recover-attendance          | POST        |
+| │   └── mark-inactive/key={pass}    | POST        |
+| └── **accelerate/**                 |             |
+|     ├── assign-sa                   | PUT         |
+|     ├── process-attendance          | POST        |
+|     ├── process-canvas              | POST        |
+|     ├── update-time-commitment      | PUT         |
+|     └── assign-sa-all               | PUT         |
+| **system/**                         |             |
+| └── clean-inactive-requests         | POST        |
+
+### Domain Content
+
+Not every domain will require each of the following files. Define these abstractions as they are needed.
+
+| **Path**             | **Description**                                           |
+|----------------------|-----------------------------------------------------------|
+| `applications/`       | **Domain**                                                |
+| ├── `canvas_export/`  | Sub-domain `"canvas-export"`                              |
+| ├── `config.py`       | Configuration file for the `applications` domain          |
+| ├── `flows.py`        | Workflow functions that require multiple services, more dependencies |
+| ├── `models.py`       | Pydantic classes for MongoDB documents or *Postgres DTOs   |
+| ├── `router.py`       | Endpoint definitions under `"{url}/api/applications"`     |
+| ├── `schemas.py`      | Pydantic classes for request and response validation       |
+| ├── `service.py`      | Business logic, CRUD operations, fewer dependencies        |
+| └── `util.py`         | Utility functions used solely within the `applications` domain |
+
+*PostgreSQL tables as defined through SQLAlchemy classes are **only** located at `src/database/postgres/models.py` and additional SQLAlchemy entities should **not** be defined within specific domain `models.py` files.
+
+### Large Services
+
+Not all domains can be defined from the endpoint paths. A large, internally defined service, such as an emailing service, would be defined within its own domain (ex: `src/email`). All models and schemas, routers, service functions, configuration, and other functionality specific to this aggregate should be located in this service's domain.
+
 ## Repository Management
 
 ### Creating Issues
