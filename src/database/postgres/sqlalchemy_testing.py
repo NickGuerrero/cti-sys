@@ -1,7 +1,6 @@
-from src.app.database import SessionFactory
-from src.app.models.postgres.models import *
+from src.database.postgres.core import SessionFactory
+from src.database.postgres.models import *
 
-from sqlalchemy.orm import Session
 from sqlalchemy import select, update, delete
 from datetime import datetime
 
