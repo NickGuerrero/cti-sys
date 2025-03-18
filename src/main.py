@@ -14,7 +14,7 @@ from src.config import APPLICATIONS_COLLECTION
 from src.db_scripts.mongo import close_mongo, get_mongo, init_mongo, ping_mongo
 
 from .app.database import make_session
-from .app.models.postgres.models import Student, StudentEmail, Attendance, StudentAttendance, AccelerateCourseProgress, AlternateEmailRequest
+from .app.models.postgres.models import Student, StudentEmail, Attendance, StudentAttendance, AlternateEmailRequest
 from .app.models.postgres.schemas import StudentSchema
 
 @asynccontextmanager
