@@ -20,7 +20,7 @@ from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COUR
 from src.db_scripts.mongo import get_mongo
 from src.main import app, check_student_activity, CheckActivityRequest, CheckActivityResponse
 from src.app.database import make_session
-from src.app.models.postgres.models import Student, StudentEmail, Attendance, StudentAttendance, AccelerateCourseProgress
+from src.app.models.postgres.models import Student, StudentEmail, Attendance, StudentAttendance
 
 
 client = TestClient(app)
@@ -684,27 +684,22 @@ class TestModifyAlternateEmails:
 class TestCheckActivity:
     
     def test_check_activity_active(self, mock_postgresql_db):
-        """Test checking activity for active students."""
+        """Test checking activity for active students based only on attendance."""
         mock_db = mock_postgresql_db
 
         mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
-        mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
 
+        # Mock attendance
         mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [mock_student_active],
-            [mock_student_inactive],
-            [mock_student_active, mock_student_inactive]
+            [mock_student_active]  # For active students
         ]
-
-        # Mock the count method to return an integer
-        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1
+        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1  # Attendance count
 
         request_data = {
             "target": "active",
             "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
             "activity_thresholds": {
-                "last_attended_session": ["2024-07-04"],
-                "completed_courses": ["101", "101A"]
+                "last_attended_session": ["2024-07-04"]
             }
         }
 
@@ -712,7 +707,6 @@ class TestCheckActivity:
 
         assert response.status_code == 200
         assert response.json() == {"status": 200}
-
         mock_db.commit.assert_called_once()
 
     def test_check_activity_inactive(self, mock_postgresql_db):
@@ -729,14 +723,13 @@ class TestCheckActivity:
         ]
 
         # Mock the count method to return an integer
-        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 1
+        mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 0
 
         request_data = {
             "target": "inactive",
             "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
             "activity_thresholds": {
-                "last_attended_session": ["2024-07-04"],
-                "completed_courses": ["101", "101A"]
+                "last_attended_session": ["2024-07-04"]
             }
         }
         response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
@@ -764,8 +757,7 @@ class TestCheckActivity:
             "target": "both",
             "active_start": (datetime.now() - timedelta(weeks=2)).isoformat(),
             "activity_thresholds": {
-                "last_attended_session": ["2024-07-04"],
-                "completed_courses": ["101", "101A"]
+                "last_attended_session": ["2024-07-04"]
             }
         }
 

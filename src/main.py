@@ -257,9 +257,4 @@ def check_student_activity(student: Student, active_start: datetime, activity_th
         Attendance.session_type.in_(activity_thresholds.get("last_attended_session", []))
     ).count()
 
-    completed_courses = db.query(AccelerateCourseProgress).filter(
-        AccelerateCourseProgress.cti_id == student.cti_id,
-        AccelerateCourseProgress.latest_course.in_(activity_thresholds.get("completed_courses", []))
-    ).count()
-
-    return attended_sessions > 0 or completed_courses > 0
+    return attended_sessions > 0
