@@ -14,7 +14,7 @@ def fetch_current_emails(google_form_email: str, db: Session) -> Dict[str, Any]:
     then fetches all associated emails—including the primary email—and returns them in a dictionary
     for easy JSON conversion. It is primarily used for testing.
     """
-    # Query for the email record using a case-insensitive match.
+    # Query for the email record using a case insensitive match.
     email_record = db.query(StudentEmail).filter(
         func.lower(StudentEmail.email) == google_form_email
     ).first()
@@ -131,7 +131,7 @@ def add_alternate_emails(
     existing_emails = {email.email.lower() for email in student_email_records}
 
     for email_lower in alt_emails:
-        # Skip if the email is scheduled for removal or already exists.
+        # Skip if it's in both add and remove lists or if student already has this email.
         if email_lower in removed_emails or email_lower in existing_emails:
             continue
 
@@ -231,5 +231,5 @@ def modify(*, request: AlternateEmailRequest, db: Session) -> None:
         db=db
     )
 
-    # Step 6: Commit the transaction to save all changes to the database.
+    # Step 6: Commit all changes to the database.
     db.commit()
