@@ -152,7 +152,7 @@ class TestModifyAlternateEmails:
     # Error Conditions
     # ====================
 
-    def test_add_alternate_email_already_exists(self, monkeypatch, mock_postgresql_db):
+    def test_add_alternate_email_already_exists(self, mock_postgresql_db):
         """Test error when an alternate email is already associated with another student."""
         student = Student(cti_id=1, fname="Jane", lname="Doe")
         student_email = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
@@ -175,7 +175,7 @@ class TestModifyAlternateEmails:
         detail = response.json().get("detail", "")
         assert "already associated with another student" in detail
 
-    def test_student_not_found_by_email(self, monkeypatch, mock_postgresql_db):
+    def test_student_not_found_by_email(self, mock_postgresql_db):
         """Test error when no student is found for the given Google Form email."""
         mock_postgresql_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -188,7 +188,7 @@ class TestModifyAlternateEmails:
         assert response.status_code == 404
         assert "Student not found" in response.json().get("detail", "")
 
-    def test_primary_email_must_match_form_email(self, monkeypatch, mock_postgresql_db):
+    def test_primary_email_must_match_form_email(self, mock_postgresql_db):
         """Test error when provided primary email does not match the email used in the form."""
         student = Student(cti_id=1, fname="Jane", lname="Doe")
         primary = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
@@ -249,7 +249,7 @@ class TestModifyAlternateEmails:
             assert alt.email.lower() not in emails_lower
             assert data["primary_email"].lower() == primary.email.lower()
 
-    def test_remove_primary_email_without_new_primary(self, monkeypatch, mock_postgresql_db):
+    def test_remove_primary_email_without_new_primary(self, mock_postgresql_db):
         """
         Test error when attempting to remove the primary email without specifying a new primary.
         """
@@ -272,7 +272,7 @@ class TestModifyAlternateEmails:
         assert response.status_code == 403
         assert "Cannot remove primary email" in response.json().get("detail", "")
 
-    def test_update_primary_email_not_found(self, monkeypatch, mock_postgresql_db):
+    def test_update_primary_email_not_found(self, mock_postgresql_db):
         """
         Test error when update for setting a new primary email fails.
         """
