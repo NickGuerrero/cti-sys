@@ -1,0 +1,2 @@
+course_id,user_id,role,section_id,status,notify
+9999,email@email.email,student,9999,active,true
