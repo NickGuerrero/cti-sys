@@ -12,15 +12,9 @@ router = APIRouter()
 @router.post("/check-activity", response_model=CheckActivityResponse)
 def check_activity(
     request: CheckActivityRequest,
-    program: str = Query(..., description="The associated program. Only 'accelerate' is supported at this time."),
+    program: str = Query(..., description="The associated program."),
     db: Session = Depends(make_session),
 ):
-    if program != "accelerate":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported program",
-        )
-
     if not request.active_start:
         request.active_start = datetime.now() - timedelta(weeks=2)
 
