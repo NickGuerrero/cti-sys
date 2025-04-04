@@ -1,18 +1,93 @@
-import csv
+import os
+from fastapi import HTTPException
+from pymongo.database import Database
+from typing import List
 
-def get_application_documents():
+from src.applications.canvas_export.utils import get_csv_as_tmp_file
+from src.applications.models import ApplicationModel
+from src.config import APPLICATIONS_COLLECTION
+
+def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]:
+    """
+    Get Application documents from Mongo collection.
+
+    This function finds Application documents as ApplicationModel objects and returns them as a list.
+    HTTPException is raised if there is a DB error or no Applications are found.
+    """
+    application_collection = db.get_collection(APPLICATIONS_COLLECTION)
+    applications_cursor = application_collection.find({"canvas_id": None})
+
+    application_documents = applications_cursor.to_list()
+    if len(application_documents) == 0:
+        raise HTTPException(status_code=404, detail=f"No unenrolled applicants found.")
+    
+    return [ApplicationModel(**application) for application in application_documents]
+
+def generate_users_csv(application_documents: List[ApplicationModel] = []) -> str:
+    """
+    Converts ApplicationModel list into CSV stream data following Canvas' Users.csv format.
+    """
+    users_csv_headers = [
+        "user_id",
+        "integration_id",
+        "login_id",
+        "password",
+        "first_name",
+        "last_name",
+        "full_name",
+        "sortable_name",
+        "short_name",
+        "email",
+        "status"
+    ]
+
+    # extract the data from the Application documents for each CSV row
+    users_csv_rows = []
+    for application_document in application_documents:
+        user_row = [None] * len(users_csv_headers)
+
+        user_row[0] = application_document.email
+        user_row[2] = application_document.email
+        user_row[4] = application_document.fname
+        user_row[5] = application_document.lname
+        user_row[9] = application_document.email
+        user_row[10] = "active" # todo: replace with defined enum
+
+        users_csv_rows.append(user_row)
+
+    csv_full_path = get_csv_as_tmp_file(headers=users_csv_headers, rows=users_csv_rows, filename="Users")
+    
+    return csv_full_path
+
+def generate_unterview_enrollments_csv(application_documents: List[ApplicationModel] = []) -> str:
+    """
+    Converts ApplicationModel list into CSV stream data following Canvas' Enrollments.csv format.
+    """
     pass
+    enrollments_csv_headers = [
+        # todo:
+    ]
 
-def generate_users_csv():
-    with open("users.csv", "w", newline="") as users_csv:
-        writer = csv.writer(users_csv, dialect="excel")
-        writer.writerow([""])
-    pass
+    # extract the data from the Application documents for each CSV row
+    enrollments_csv_rows = []
+    for application_document in application_documents:
+        enrollment_row = [None] * len(enrollments_csv_headers)
 
-def generate_unterview_enrollments_csv():
-    pass
+        # todo:
 
-def import_sis_csv():
+        enrollments_csv_rows.append(enrollment_row)
+
+    csv_full_path = get_csv_as_tmp_file(headers=enrollments_csv_headers, rows=enrollments_csv_headers, filename="Enrollments")
+    
+    return csv_full_path
+
+def send_sis_csv(csv: str):
+    """
+    Sends CSV file to Canvas API, updating respective data.
+
+    todo: This will require an access token and/or authorization parameters with write scope.
+    todo: look into the size issues or whether a stream can be sent out vs a file as saved.
+    """
     pass
 
 def get_unterview_enrollments():
@@ -22,19 +97,26 @@ def get_unterview_enrollments():
 def patch_applicants_with_unterview(application_documents, unterview_enrollments):
     pass
 
-def add_applicants_to_canvas():
-    # validate params from request
+def add_applicants_to_canvas(db: Database):
+    """
+    Entry function for adding applicants to Canvas and the Unterview course.
+    """
+    
+    # todo: define batch identifier
 
     # fetch documents
-    application_documents = get_application_documents()
-    # if no documents -> error out
+    application_documents = get_unenrolled_application_documents(db=db)
 
-    # generate CSVs (users.csv and enrollments.csv)
-    users_csv = generate_users_csv()
-    enrollments_csv = generate_unterview_enrollments_csv()
+    # generate and send CSVs (users.csv and enrollments.csv)
+    users_csv = generate_users_csv(application_documents=application_documents)
+    enrollments_csv = generate_unterview_enrollments_csv(application_documents=application_documents)
 
-    import_sis_csv(users_csv)
-    import_sis_csv(enrollments_csv)
+    send_sis_csv(csv=users_csv)
+    send_sis_csv(csv=enrollments_csv)
+
+    # delete temp csv files
+    os.remove(users_csv)
+    # os.remove(enrollments_csv)
 
     # fetch enrollments for current section (Target Summer 2025)
     unterview_enrollments = get_unterview_enrollments()
@@ -43,18 +125,7 @@ def add_applicants_to_canvas():
     patch_applicants_with_unterview(
         application_documents,
         unterview_enrollments,
-        )
-
-    """
-    last_canvas_batch [boolean]             -> 
-    canvas_id [int]                         -> 
-    added_unterview_course [boolean]        -> True (unless there is an ID)
-    next_steps_sent [boolean]
-    accessed_unterview [boolean]
-    commitment_quiz_completed [boolean]
-    master_added [boolean]
-    """
+    )
 
     # respond with success, number of updated documents, batch date
-
-    pass
+    return {"success": True, "path": users_csv}

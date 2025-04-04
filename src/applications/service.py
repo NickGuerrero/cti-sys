@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pymongo.database import Database
 
-from src.applications.models import ApplicationBase, ApplicationModel
+from src.applications.models import ApplicationModel
 from src.applications.schemas import ApplicationCreateRequest
 from src.config import APPLICATIONS_COLLECTION
 
