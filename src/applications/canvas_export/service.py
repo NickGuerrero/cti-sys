@@ -3,9 +3,10 @@ from fastapi import HTTPException
 from pymongo.database import Database
 from typing import List
 
+from src.applications.canvas_export.constants import EnrollmentRole, EnrollmentStatus, UserStatus
 from src.applications.canvas_export.utils import get_csv_as_tmp_file
 from src.applications.models import ApplicationModel
-from src.config import APPLICATIONS_COLLECTION
+from src.config import APPLICATIONS_COLLECTION, settings
 
 def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]:
     """
@@ -51,7 +52,7 @@ def generate_users_csv(application_documents: List[ApplicationModel] = []) -> st
         user_row[4] = application_document.fname
         user_row[5] = application_document.lname
         user_row[9] = application_document.email
-        user_row[10] = "active" # todo: replace with defined enum
+        user_row[10] = UserStatus.ACTIVE.value
 
         users_csv_rows.append(user_row)
 
@@ -63,9 +64,13 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     """
     Converts ApplicationModel list into CSV stream data following Canvas' Enrollments.csv format.
     """
-    pass
+    
     enrollments_csv_headers = [
-        # todo:
+        "course_id", # todo: may not be required with section_id
+        "user_id",
+        "role",
+        "section_id", # todo: may not be required with course_id
+        "status"
     ]
 
     # extract the data from the Application documents for each CSV row
@@ -73,11 +78,15 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     for application_document in application_documents:
         enrollment_row = [None] * len(enrollments_csv_headers)
 
-        # todo:
+        enrollment_row[0] = settings.unterview_id
+        enrollment_row[1] = application_document.email
+        enrollment_row[2] = EnrollmentRole.STUDENT.value
+        enrollment_row[3] = settings.current_section
+        enrollment_row[4] = EnrollmentStatus.ACTIVE.value
 
         enrollments_csv_rows.append(enrollment_row)
 
-    csv_full_path = get_csv_as_tmp_file(headers=enrollments_csv_headers, rows=enrollments_csv_headers, filename="Enrollments")
+    csv_full_path = get_csv_as_tmp_file(headers=enrollments_csv_headers, rows=enrollments_csv_rows, filename="Enrollments")
     
     return csv_full_path
 
@@ -102,7 +111,7 @@ def add_applicants_to_canvas(db: Database):
     Entry function for adding applicants to Canvas and the Unterview course.
     """
     
-    # todo: define batch identifier
+    # batch_date = datetime.now(timezone.utc)
 
     # fetch documents
     application_documents = get_unenrolled_application_documents(db=db)
@@ -116,7 +125,7 @@ def add_applicants_to_canvas(db: Database):
 
     # delete temp csv files
     os.remove(users_csv)
-    # os.remove(enrollments_csv)
+    os.remove(enrollments_csv)
 
     # fetch enrollments for current section (Target Summer 2025)
     unterview_enrollments = get_unterview_enrollments()

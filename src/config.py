@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_env: str = "development"
+    unterview_id: int = 5
+    current_section: str = "Target Summer 2025" # todo: how this is used/determined currently?
 
     model_config = {
         "case_sensitive": False,

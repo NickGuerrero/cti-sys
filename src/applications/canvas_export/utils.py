@@ -5,7 +5,7 @@ from typing import Any, List
 
 def get_csv_as_stream(
     headers: List[str],
-    rows: List[Any] | None
+    rows: List[Any]
 ) -> str:
     """
     Use in-memory buffer to get CSV as string data. Returns the buffered string.
@@ -22,7 +22,7 @@ def get_csv_as_stream(
 
 def get_csv_as_tmp_file(
     headers: List[str],
-    rows: List[Any] | None,
+    rows: List[Any],
     filename: str
 ) -> str:
     """
