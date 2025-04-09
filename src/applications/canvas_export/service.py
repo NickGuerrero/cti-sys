@@ -1,9 +1,11 @@
 import os
 from fastapi import HTTPException
+from pymongo import UpdateOne
 from pymongo.database import Database
-from typing import List
+from typing import Dict, List
 
 from src.applications.canvas_export.constants import EnrollmentRole, EnrollmentStatus, UserStatus
+from src.applications.canvas_export.schemas import SISImportObject, SISUserObject
 from src.applications.canvas_export.utils import get_csv_as_tmp_file
 from src.applications.models import ApplicationModel
 from src.config import APPLICATIONS_COLLECTION, settings
@@ -90,7 +92,7 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     
     return csv_full_path
 
-def send_sis_csv(csv: str):
+def send_sis_csv(csv: str) -> SISImportObject:
     """
     Sends CSV file to Canvas API, updating respective data.
 
@@ -99,16 +101,58 @@ def send_sis_csv(csv: str):
     """
     pass
 
-def get_unterview_enrollments():
+def get_unterview_enrollments() -> List[SISUserObject]:
     # may require pagination for parsing through the enrollments
     # GET /api/v1/courses/:course_id/search_users
+    """
+    Get the users (students) enrolled in the Unterview course.
+    """
     pass
 
 def patch_applicants_with_unterview(
+    db: Database,
     application_documents: List[ApplicationModel],
-    unterview_enrollments
-):
-    pass
+    unterview_enrollments: List[SISUserObject]
+) -> int:
+    """
+    Updates Application documents in-place and bulk writes to MongoDB.
+
+    This function updates the application_documents parameter passed in-place, and
+    it returns the number of successfully modified documents from the DB bulk_write.
+    """
+
+    # create dictionary mapping application_documents_email to index
+    applicant_email_to_index: Dict[str, ApplicationModel] = {}
+    for index_for_email in range(0, len(application_documents)):
+        applicant_email_to_index[application_documents[index_for_email].email] = index_for_email
+
+    write_operations: List[UpdateOne] = []
+
+    # use dictionary to update documents based on Unterview-enrolled Users
+    for enrolled_user in unterview_enrollments:
+        index_of_user = applicant_email_to_index.get(enrolled_user.email)
+
+        # skip enrollments not based on applications
+        if index_of_user is None:
+            continue
+
+        # update the document
+        application_document: ApplicationModel = application_documents[index_of_user]
+        application_document.added_unterview_course = True
+        application_document.canvas_id = enrolled_user.id
+
+        # queue update for database operation
+        write_operations.append(
+            UpdateOne(
+                filter={"email": application_document.email},
+                update={"$set": {
+                    "canvas_id": application_document.canvas_id,
+                    "added_unterview_course": application_document.added_unterview_course
+                }}
+            )
+        )
+    
+    return db.get_collection(APPLICATIONS_COLLECTION).bulk_write(write_operations).modified_count
 
 def add_applicants_to_canvas(db: Database):
     """
@@ -136,6 +180,7 @@ def add_applicants_to_canvas(db: Database):
 
     # update documents with Canvas information
     patch_applicants_with_unterview(
+        db,
         application_documents,
         unterview_enrollments,
     )
