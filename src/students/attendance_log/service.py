@@ -101,7 +101,6 @@ def fetch_csv_dataframe(link: str) -> pd.DataFrame:
 
     return df
 
-
 def process_attendance_row(
     row_data: pd.Series,
     df_columns: pd.Index,
@@ -113,39 +112,32 @@ def process_attendance_row(
     
     - If the email column is empty, this row is skipped entirely.
     - Otherwise, we compute a Pear Deck score from the ratio of answered slides 
-      to total slides (slides are everything after the first 3 columns).
+      to total slides (slides are any column name that starts with 'Slide ').
     - If the email matches an existing student, update a student_attendance record.
     - If the email is not found, inserts a missing_attendance record.
-    
-    Note on Score:
-        The 'peardeck_score' is currently calculated as answered_count / total_slides.
-        In the future, we might use the highest answered_count among all students as the denominator.
-        For example, if 5 slides are available but no one answers more than 4, the denominator would be 4.
-        This would require either a two-pass process or tracking the highest answered_count globally, 
-        which isn't implemented yet.
     """
+
+    # Get email and name, skipping the row if there's no email
     email = str(row_data["Email"]).strip().lower()
     name = str(row_data["Name"]).strip()
-
-    # Identify the "slides" columns, everything after the first 3
-    slides = df_columns[3:]
-    answers = []
-    for col in slides:
-        val = str(row_data.get(col, "")).strip()
-        answers.append(val)
-
-    # Check if the answer is a valid response
-    # We assume valid responses are non-empty strings
-    answered_count = sum(1 for ans in answers if ans)
-    total_slides = len(answers)
-    # Calculate the score as a percentage of answered slides
-    peardeck_score = float(answered_count) / total_slides if total_slides else 0.0
-    session_score = peardeck_score
-    attended_minutes = 0
-
     if not email:
-        # No email then skip
-        return
+        return  # No email, skip entirely
+
+    # Only consider columns that start with "Slide "
+    slide_columns = [col for col in df_columns if col.startswith("Slide ")]
+
+    # Count only answers that are not blank or 'nan'
+    answered_count = 0
+    for col in slide_columns:
+        val = str(row_data.get(col, "")).strip().lower()
+        # If val isn't empty or 'nan', we count it as answered
+        if val and val != "nan":
+            answered_count += 1
+
+    total_slides = len(slide_columns)
+    peardeck_score = answered_count / total_slides if total_slides else 0.0
+    session_score = peardeck_score
+    attended_minutes = -1
 
     # Attempt to find the student by email
     email_record = (
@@ -155,7 +147,7 @@ def process_attendance_row(
     )
 
     if not email_record:
-        # Insert missing attendance
+        # If there's no matching student, insert into missing_attendance
         missing = MissingAttendance(
             email=email,
             session_id=session_id,
@@ -165,23 +157,21 @@ def process_attendance_row(
         )
         db.merge(missing)
     else:
-        # Found student
+        # Otherwise, update or insert the student's attendance
         cti_id = email_record.cti_id
         existing_attendance = (
             db.query(StudentAttendance)
               .filter(
-                StudentAttendance.cti_id == cti_id,
-                StudentAttendance.session_id == session_id
+                  StudentAttendance.cti_id == cti_id,
+                  StudentAttendance.session_id == session_id
               )
               .first()
         )
         if existing_attendance:
-            # Update existing attendance record
             existing_attendance.peardeck_score = peardeck_score
             existing_attendance.attended_minutes = attended_minutes
             existing_attendance.session_score = session_score
         else:
-            # Insert new attendance record
             new_attendance = StudentAttendance(
                 cti_id=cti_id,
                 session_id=session_id,
