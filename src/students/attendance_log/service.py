@@ -11,27 +11,32 @@ import io
 from src.database.postgres.models import (
     Attendance, StudentEmail, MissingAttendance, StudentAttendance
 )
-from sqlalchemy.exc import SQLAlchemyError, NoResultFound
+from sqlalchemy.exc import SQLAlchemyError
 
 def process_attendance(db: Session) -> Dict[str, int]:
     """
-    - Find all unprocessed Attendance records for link_type='PearDeck'.
+    Process unprocessed Attendance records with link_type='PearDeck':
+    - Query all Attendance records where last_processed_date is None and link_type is 'PearDeck'.
     - For each record:
-        - Try to process it
-        - If it fails, rollback + sheets_failed += 1
-        - If it succeeds, commit + sheets_processed += 1
-    - Return a dict with final totals
+        - Attempt to process the record.
+        - On success, commit the transaction and increment sheets_processed.
+        - On failure, rollback the transaction and increment sheets_failed.
+    - Return a dictionary containing the counts of processed and failed sheets.
     """
+
+    # Query for unprocessed attendance records
     unprocessed = (
         db.query(Attendance)
-          .filter(Attendance.last_processed_date.is_(None))
-          .filter(func.lower(Attendance.link_type) == "peardeck")
-          .all()
+            .filter(Attendance.last_processed_date.is_(None))
+            .filter(func.lower(Attendance.link_type) == "peardeck")
+            .all()
     )
 
     sheets_processed = 0
     sheets_failed = 0
 
+    # Process each attendance record
+    # We use a try/except block to handle errors on a per-record basis
     for record in unprocessed:
         try:
             process_attendance_record(record, db=db)
@@ -41,6 +46,8 @@ def process_attendance(db: Session) -> Dict[str, int]:
             db.rollback()
             sheets_failed += 1
 
+    # Return the result
+    # We don't raise an error here, we just return the counts
     return {
         "status": 200,
         "sheets_processed": sheets_processed,
@@ -55,6 +62,8 @@ def process_attendance_record(attendance_record: Attendance, db: Session) -> Non
     """
     df = fetch_csv_dataframe(attendance_record.link)
 
+    # Process each row in the DataFrame
+    # We use iterrows() to iterate over the DataFrame rows
     for _, row in df.iterrows():
         process_attendance_row(
             row_data=row,
@@ -65,22 +74,6 @@ def process_attendance_record(attendance_record: Attendance, db: Session) -> Non
 
     # Mark as processed
     attendance_record.last_processed_date = datetime.now()
-
-# def fetch_csv_dataframe(link: str) -> pd.DataFrame:
-#     """
-#     Converts a Google Sheet link to a CSV export link, fetches CSV,
-#     returns a pandas DataFrame. Checks for 'Name' and 'Email' columns.
-#     Raises ValueError if missing columns or fetch fails.
-#     """
-#     csv_url = convert_google_sheet_link_to_csv(link)
-#     resp = requests.get(csv_url)
-#     resp.raise_for_status()
-
-#     # Parse CSV
-#     df = pd.read_csv(resp.content.decode("utf-8"))
-#     if "Name" not in df.columns or "Email" not in df.columns:
-#         raise ValueError("Required columns (Name, Email) not found in CSV.")
-#     return df
 
 def fetch_csv_dataframe(link: str) -> pd.DataFrame:
     """
@@ -116,7 +109,20 @@ def process_attendance_row(
     db: Session
 ) -> None:
     """
-    Given one row, calculates scores and updates either student_attendance or missing_attendance.
+    Processes a single row of attendance data:
+    
+    - If the email column is empty, this row is skipped entirely.
+    - Otherwise, we compute a Pear Deck score from the ratio of answered slides 
+      to total slides (slides are everything after the first 3 columns).
+    - If the email matches an existing student, update a student_attendance record.
+    - If the email is not found, inserts a missing_attendance record.
+    
+    Note on Score:
+        The 'peardeck_score' is currently calculated as answered_count / total_slides.
+        In the future, we might use the highest answered_count among all students as the denominator.
+        For example, if 5 slides are available but no one answers more than 4, the denominator would be 4.
+        This would require either a two-pass process or tracking the highest answered_count globally, 
+        which isn't implemented yet.
     """
     email = str(row_data["Email"]).strip().lower()
     name = str(row_data["Name"]).strip()
@@ -128,8 +134,11 @@ def process_attendance_row(
         val = str(row_data.get(col, "")).strip()
         answers.append(val)
 
+    # Check if the answer is a valid response
+    # We assume valid responses are non-empty strings
     answered_count = sum(1 for ans in answers if ans)
     total_slides = len(answers)
+    # Calculate the score as a percentage of answered slides
     peardeck_score = float(answered_count) / total_slides if total_slides else 0.0
     session_score = peardeck_score
     attended_minutes = 0
@@ -156,21 +165,23 @@ def process_attendance_row(
         )
         db.merge(missing)
     else:
-        # Found student -> upsert into student_attendance
+        # Found student
         cti_id = email_record.cti_id
         existing_attendance = (
             db.query(StudentAttendance)
               .filter(
-                  StudentAttendance.cti_id == cti_id,
-                  StudentAttendance.session_id == session_id
+                StudentAttendance.cti_id == cti_id,
+                StudentAttendance.session_id == session_id
               )
               .first()
         )
         if existing_attendance:
+            # Update existing attendance record
             existing_attendance.peardeck_score = peardeck_score
             existing_attendance.attended_minutes = attended_minutes
             existing_attendance.session_score = session_score
         else:
+            # Insert new attendance record
             new_attendance = StudentAttendance(
                 cti_id=cti_id,
                 session_id=session_id,
@@ -204,6 +215,8 @@ def convert_google_sheet_link_to_csv(link: str) -> str:
     if "gid" in query_params and len(query_params["gid"]) > 0:
         gid_value = query_params["gid"][0]
 
+    # If gid is not found in query, check the fragment
+    # This is common in Google Sheets URLs
     if not gid_value and parsed.fragment:
         frag_params = parse_qs(parsed.fragment)
         if "gid" in frag_params and len(frag_params["gid"]) > 0:
@@ -212,4 +225,6 @@ def convert_google_sheet_link_to_csv(link: str) -> str:
     if not gid_value:
         gid_value = "0"
 
+    # Construct the CSV export URL
+    # Default gid is 0 if not found
     return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid_value}"
