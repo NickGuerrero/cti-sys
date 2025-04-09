@@ -101,9 +101,13 @@ def send_sis_csv(csv: str):
 
 def get_unterview_enrollments():
     # may require pagination for parsing through the enrollments
+    # GET /api/v1/courses/:course_id/search_users
     pass
 
-def patch_applicants_with_unterview(application_documents, unterview_enrollments):
+def patch_applicants_with_unterview(
+    application_documents: List[ApplicationModel],
+    unterview_enrollments
+):
     pass
 
 def add_applicants_to_canvas(db: Database):
@@ -127,7 +131,7 @@ def add_applicants_to_canvas(db: Database):
     os.remove(users_csv)
     os.remove(enrollments_csv)
 
-    # fetch enrollments for current section (Target Summer 2025)
+    # fetch enrollments for current section
     unterview_enrollments = get_unterview_enrollments()
 
     # update documents with Canvas information
