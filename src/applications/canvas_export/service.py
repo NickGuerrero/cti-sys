@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import os
 from fastapi import HTTPException
 from pymongo import UpdateOne
@@ -159,7 +160,7 @@ def add_applicants_to_canvas(db: Database):
     Entry function for adding applicants to Canvas and the Unterview course.
     """
     
-    # batch_date = datetime.now(timezone.utc)
+    batch_date = datetime.now(timezone.utc) # todo: revisit
 
     # fetch documents
     application_documents = get_unenrolled_application_documents(db=db)
@@ -180,9 +181,9 @@ def add_applicants_to_canvas(db: Database):
 
     # update documents with Canvas information
     patch_applicants_with_unterview(
-        db,
-        application_documents,
-        unterview_enrollments,
+        db=db,
+        application_documents=application_documents,
+        unterview_enrollments=unterview_enrollments,
     )
 
     # respond with success, number of updated documents, batch date
