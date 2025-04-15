@@ -113,7 +113,8 @@ def get_unterview_enrollments() -> List[SISUserObject]:
 def patch_applicants_with_unterview(
     db: Database,
     application_documents: List[ApplicationModel],
-    unterview_enrollments: List[SISUserObject]
+    unterview_enrollments: List[SISUserObject],
+    batch_date: datetime
 ) -> int:
     """
     Updates Application documents in-place and bulk writes to MongoDB.
@@ -148,7 +149,8 @@ def patch_applicants_with_unterview(
                 filter={"email": application_document.email},
                 update={"$set": {
                     "canvas_id": application_document.canvas_id,
-                    "added_unterview_course": application_document.added_unterview_course
+                    "added_unterview_course": application_document.added_unterview_course,
+                    "last_batch_update": batch_date
                 }}
             )
         )
@@ -160,7 +162,7 @@ def add_applicants_to_canvas(db: Database):
     Entry function for adding applicants to Canvas and the Unterview course.
     """
     
-    batch_date = datetime.now(timezone.utc) # todo: revisit
+    batch_date = datetime.now(timezone.utc)
 
     # fetch documents
     application_documents = get_unenrolled_application_documents(db=db)
@@ -184,6 +186,7 @@ def add_applicants_to_canvas(db: Database):
         db=db,
         application_documents=application_documents,
         unterview_enrollments=unterview_enrollments,
+        batch_date=batch_date
     )
 
     # respond with success, number of updated documents, batch date

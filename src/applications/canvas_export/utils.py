@@ -30,7 +30,7 @@ def get_csv_as_tmp_file(
 
     Uses the tempfile module to save the CSV file in the system's tmp directory.
     This saves the filename in the format of `"<prefix>_<random string>.<suffix>"`
-    for uniqueness of files stored.
+    for uniqueness of files stored. All column data is written as str.
     """
     with tempfile.NamedTemporaryFile(mode="w", prefix=f"{filename}_", suffix=".csv", delete=False) as csvfile:
         csv_writer = csv.writer(csvfile)

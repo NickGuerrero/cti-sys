@@ -53,3 +53,7 @@ class SISUserObject(BaseModel):
     time_zone: str
     bio: str
     pronouns: str
+
+class CanvasExportResponse(BaseModel):
+    # todo: define with known call responses
+    pass
