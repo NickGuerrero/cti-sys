@@ -48,3 +48,4 @@ pytest-cov==4.1.0
 mongomock==4.3.0
 pydantic-settings==2.8.1
 requests==2.32.3
+pandas==2.2.3
