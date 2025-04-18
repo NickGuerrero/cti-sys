@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 import os
+from dotenv import load_dotenv
 from fastapi import HTTPException
 from pymongo import UpdateOne
 from pymongo.database import Database
 from typing import Dict, List
+import requests
 
 from src.applications.canvas_export.constants import EnrollmentRole, EnrollmentStatus, UserStatus
 from src.applications.canvas_export.schemas import SISImportObject, SISUserObject
@@ -59,7 +61,11 @@ def generate_users_csv(application_documents: List[ApplicationModel] = []) -> st
 
         users_csv_rows.append(user_row)
 
-    csv_full_path = get_csv_as_tmp_file(headers=users_csv_headers, rows=users_csv_rows, filename="Users")
+    csv_full_path = get_csv_as_tmp_file(
+        headers=users_csv_headers,
+        rows=users_csv_rows,
+        filename="Users"
+    )
     
     return csv_full_path
 
@@ -89,26 +95,66 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
 
         enrollments_csv_rows.append(enrollment_row)
 
-    csv_full_path = get_csv_as_tmp_file(headers=enrollments_csv_headers, rows=enrollments_csv_rows, filename="Enrollments")
+    csv_full_path = get_csv_as_tmp_file(
+        headers=enrollments_csv_headers,
+        rows=enrollments_csv_rows,
+        filename="Enrollments"
+    )
     
     return csv_full_path
 
 def send_sis_csv(csv: str) -> SISImportObject:
     """
     Sends CSV file to Canvas API, updating respective data.
-
-    todo: This will require an access token and/or authorization parameters with write scope.
-    todo: look into the size issues or whether a stream can be sent out vs a file as saved.
     """
-    pass
+    test_url = settings.canvas_api_url
+    load_dotenv()
+    access_token = os.environ.get("CTI_ACCESS_TOKEN")
+    if access_token is None:
+        return {"Error": "Access token not found"}
 
-def get_unterview_enrollments() -> List[SISUserObject]:
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "text/csv"
+    }
+
+    with open(csv, "rb") as file:
+        response = requests.get(
+            url=f"{test_url}/api/v1/accounts/1",
+            headers=headers,
+            data=file
+        )
+    
+    return response.json()
+
+def get_unterview_enrollments():
     # may require pagination for parsing through the enrollments
     # GET /api/v1/courses/:course_id/search_users
+    # NOTE this will call over a pagination of 3800+ students
+    # NOTE each page will limit to 100 Users 
+    # NOTE could grab only the "invited" users -> may lead to race condition if student accepts
+    # FIXME instead of a course call, make it a section call? -> still 1650 students
     """
     Get the users (students) enrolled in the Unterview course.
     """
-    pass
+    test_url = settings.canvas_api_url
+    load_dotenv()
+    access_token = os.environ.get("CTI_ACCESS_TOKEN")
+    if access_token is None:
+        return {"Error": "Access token not found"}
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+    }
+
+    response = requests.get(
+        url=f"{test_url}/api/v1/courses/{settings.unterview_id}/search_users?enrollment_state=invited&per_page=100",
+        headers=headers
+    )
+    print(response.status_code)
+    # print(len(response.json()["students"]))
+
+    return response.json()
 
 def patch_applicants_with_unterview(
     db: Database,
@@ -161,6 +207,7 @@ def add_applicants_to_canvas(db: Database):
     """
     Entry function for adding applicants to Canvas and the Unterview course.
     """
+    # return get_unterview_enrollments()
     
     batch_date = datetime.now(timezone.utc)
 

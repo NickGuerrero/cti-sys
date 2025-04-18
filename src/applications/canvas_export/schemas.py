@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel
+from typing import Optional
+from pydantic import BaseModel, Field
 
 class SISImportObject(BaseModel):
     """
@@ -34,25 +35,26 @@ class SISUserObject(BaseModel):
     """
     Canvas User response object.
     """
-    id: int
-    name: str
+    id: int = Field(description="Canvas ID of User")
+    name: str = Field(description="Full name of User")
+    created_at: datetime = Field(description="When the user was instantiated within Canvas")
     sortable_name: str
-    last_name: str
-    first_name: str
-    short_name: str
-    sis_user_id: str
-    sis_import_id: int
-    integration_id: str
-    login_id: str
-    avatar_url: str
-    avatar_state: str # todo: enum
-    enrollments: None
-    email: str
-    locale: str
-    last_login: datetime
-    time_zone: str
-    bio: str
-    pronouns: str
+    last_name: Optional[str] = Field(default=None)
+    first_name: Optional[str] = Field(default=None)
+    short_name: Optional[str] = Field(default=None)
+    sis_user_id: str = Field(description="SIS User ID, defaulted as login email")
+    sis_import_id: Optional[int] = Field(default=None)
+    integration_id: Optional[str] = Field(default=None)
+    login_id: Optional[str] = Field(default=None)
+    avatar_url: Optional[str] = Field(default=None)
+    avatar_state: Optional[str] = Field(default=None)
+    enrollments: Optional[list] = Field(default=None)
+    email: Optional[str] = Field(default=None)
+    locale: Optional[str] = Field(default=None)
+    last_login: Optional[datetime] = Field(default=None)
+    time_zone: Optional[str] = Field(default=None)
+    bio: Optional[str] = Field(default=None)
+    pronouns: Optional[str] = Field(default=None)
 
 class CanvasExportResponse(BaseModel):
     # todo: define with known call responses

@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     app_env: str = "development"
     unterview_id: int = 5
-    current_section: str = "Target Summer 2025" # todo: how this is used/determined currently?
+    current_section: str = "Target Summer 2025"
+    canvas_api_url: str = "https://cti-courses.test.instructure.com" # NOTE test env not consistent
 
     model_config = {
         "case_sensitive": False,
