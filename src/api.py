@@ -21,10 +21,10 @@ api_router.include_router(
     tags=["Students"]
 )
 
-# /api/students/check-activity
+# /api/students/activity
 api_router.include_router(
     activity_router, 
-    prefix="/students/check-activity", 
+    prefix="/students/activity", 
     tags=["Students"]
 )
 
