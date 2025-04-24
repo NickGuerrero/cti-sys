@@ -4,8 +4,11 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_env: str = "development"
-    unterview_id: int = 5
-    current_section: str = "Target Summer 2025"
+    unterview_course_id: int = 5
+    unterview_sis_course_id: str = "B00400"
+    current_unterview_section_name: str = "Target Summer 2025"
+    current_unterview_sis_section_id: str = "S164"
+    current_unterview_section_id: int = 164
     canvas_api_url: str = "https://cti-courses.test.instructure.com" # NOTE test env not consistent
 
     model_config = {

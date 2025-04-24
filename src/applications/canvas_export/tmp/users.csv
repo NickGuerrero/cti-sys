@@ -1,2 +1,0 @@
-user_id,integration_id,login_id,password,first_name,last_name,full_name,sortable_name,short_name,email,status
-EMAIL,null,EMAIL,null,FIRST,LAST,null,null,null,EMAIL,active

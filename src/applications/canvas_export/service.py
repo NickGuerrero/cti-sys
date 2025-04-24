@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import os
-from dotenv import load_dotenv
+from time import perf_counter, sleep, time
 from fastapi import HTTPException
 from pymongo import UpdateOne
 from pymongo.database import Database
@@ -9,7 +9,7 @@ import requests
 
 from src.applications.canvas_export.constants import EnrollmentRole, EnrollmentStatus, UserStatus
 from src.applications.canvas_export.schemas import SISImportObject, SISUserObject
-from src.applications.canvas_export.utils import get_csv_as_tmp_file
+from src.applications.canvas_export.utils import get_canvas_access_token, get_csv_as_tmp_file
 from src.applications.models import ApplicationModel
 from src.config import APPLICATIONS_COLLECTION, settings
 
@@ -75,10 +75,10 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     """
     
     enrollments_csv_headers = [
-        "course_id", # todo: may not be required with section_id
+        "course_id",
         "user_id",
         "role",
-        "section_id", # todo: may not be required with course_id
+        "section_id",
         "status"
     ]
 
@@ -87,10 +87,10 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     for application_document in application_documents:
         enrollment_row = [None] * len(enrollments_csv_headers)
 
-        enrollment_row[0] = settings.unterview_id
+        enrollment_row[0] = settings.unterview_sis_course_id
         enrollment_row[1] = application_document.email
         enrollment_row[2] = EnrollmentRole.STUDENT.value
-        enrollment_row[3] = settings.current_section
+        enrollment_row[3] = settings.current_unterview_sis_section_id
         enrollment_row[4] = EnrollmentStatus.ACTIVE.value
 
         enrollments_csv_rows.append(enrollment_row)
@@ -106,55 +106,71 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
 def send_sis_csv(csv: str) -> SISImportObject:
     """
     Sends CSV file to Canvas API, updating respective data.
+
+    This function requires the working thread to wait for import resolving to `"progress": "100"`
     """
     test_url = settings.canvas_api_url
-    load_dotenv()
-    access_token = os.environ.get("CTI_ACCESS_TOKEN")
-    if access_token is None:
-        return {"Error": "Access token not found"}
-
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {get_canvas_access_token()}",
         "Content-Type": "text/csv"
     }
 
     with open(csv, "rb") as file:
-        response = requests.get(
-            url=f"{test_url}/api/v1/accounts/1",
+        response = requests.post(
+            url=f"{test_url}/api/v1/accounts/1/sis_imports?extension=csv",
             headers=headers,
             data=file
         )
-    
-    return response.json()
 
-def get_unterview_enrollments():
-    # may require pagination for parsing through the enrollments
-    # GET /api/v1/courses/:course_id/search_users
-    # NOTE this will call over a pagination of 3800+ students
-    # NOTE each page will limit to 100 Users 
-    # NOTE could grab only the "invited" users -> may lead to race condition if student accepts
-    # FIXME instead of a course call, make it a section call? -> still 1650 students
-    """
-    Get the users (students) enrolled in the Unterview course.
-    """
-    test_url = settings.canvas_api_url
-    load_dotenv()
-    access_token = os.environ.get("CTI_ACCESS_TOKEN")
-    if access_token is None:
-        return {"Error": "Access token not found"}
+    initial_import = SISImportObject(**response.json())
 
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {get_canvas_access_token()}"
+    }
+    url = f"{test_url}/api/v1/accounts/1/sis_imports/{initial_import.id}"
+
+    start_time = time()
+    while True:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = SISImportObject(**response.json())
+
+        progress = data.progress
+        state = data.workflow_state
+
+        print(f"Import {data.id}: {progress}% - {state}")
+
+        if progress == 100:
+            break
+
+        if time() - start_time > 60:
+            raise TimeoutError(f"SIS import {data.id} did not complete within {60} seconds")
+
+        sleep(2)
+
+    return SISImportObject(**response.json())
+
+def get_unterview_enrollments() -> List[SISUserObject]:
+    """
+    Use Canvas API to get list of Users enrolled in Unterview.
+
+    This function will respond with the list of Users enrolled as students
+    and under the current section.
+    NOTE: future implementation of course management may make a paginated API fetch
+    using GET Course Students more optimal than a GET Section Info.
+    """
+    url = f"{settings.canvas_api_url}/api/v1/courses/{settings.unterview_course_id}/sections/{settings.current_unterview_section_id}?include=students"
+    headers = {
+        "Authorization": f"Bearer {get_canvas_access_token()}",
     }
 
-    response = requests.get(
-        url=f"{test_url}/api/v1/courses/{settings.unterview_id}/search_users?enrollment_state=invited&per_page=100",
-        headers=headers
-    )
-    print(response.status_code)
-    # print(len(response.json()["students"]))
+    response = requests.get(url=url, headers=headers)
+    response.raise_for_status()
 
-    return response.json()
+    users = response.json()["students"]
+    enrolled_users: List[SISImportObject] = [SISUserObject(**user) for user in users]
+
+    return enrolled_users
 
 def patch_applicants_with_unterview(
     db: Database,
@@ -178,7 +194,8 @@ def patch_applicants_with_unterview(
 
     # use dictionary to update documents based on Unterview-enrolled Users
     for enrolled_user in unterview_enrollments:
-        index_of_user = applicant_email_to_index.get(enrolled_user.email)
+        # using sis_user_id as email is not a required response field
+        index_of_user = applicant_email_to_index.get(enrolled_user.sis_user_id)
 
         # skip enrollments not based on applications
         if index_of_user is None:
@@ -212,29 +229,45 @@ def add_applicants_to_canvas(db: Database):
     batch_date = datetime.now(timezone.utc)
 
     # fetch documents
+    t1 = perf_counter()
     application_documents = get_unenrolled_application_documents(db=db)
+    print(f"Elapsed to grab documents: {perf_counter() - t1:.2f}s")
 
     # generate and send CSVs (users.csv and enrollments.csv)
+    t2 = perf_counter()
     users_csv = generate_users_csv(application_documents=application_documents)
-    enrollments_csv = generate_unterview_enrollments_csv(application_documents=application_documents)
+    print(f"Elapsed to generate users csv: {perf_counter() - t2:.2f}s")
 
+    t3 = perf_counter()
+    enrollments_csv = generate_unterview_enrollments_csv(application_documents=application_documents)
+    print(f"Elapsed to generate enrollments csv: {perf_counter() - t3:.2f}s")
+
+    t4 = perf_counter()
     send_sis_csv(csv=users_csv)
+    print(f"Elapsed to send users csv: {perf_counter() - t4:.2f}s")
+
+    t5 = perf_counter()
     send_sis_csv(csv=enrollments_csv)
+    print(f"Elapsed to send enrollments csv: {perf_counter() - t5:.2f}s")
 
     # delete temp csv files
     os.remove(users_csv)
     os.remove(enrollments_csv)
 
     # fetch enrollments for current section
+    t6 = perf_counter()
     unterview_enrollments = get_unterview_enrollments()
+    print(f"Elapsed to get enrollments: {perf_counter() - t6:.2f}s")
 
     # update documents with Canvas information
+    t7 = perf_counter()
     patch_applicants_with_unterview(
         db=db,
         application_documents=application_documents,
         unterview_enrollments=unterview_enrollments,
         batch_date=batch_date
     )
+    print(f"Elapsed to patch applicant documents: {perf_counter() - t7:.2f}s")
 
     # respond with success, number of updated documents, batch date
-    return {"success": True, "path": users_csv}
+    return {"success": True}

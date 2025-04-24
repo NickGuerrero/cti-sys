@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 class SISImportObject(BaseModel):
@@ -11,25 +11,25 @@ class SISImportObject(BaseModel):
     """
     id: int
     created_at: datetime
-    ended_at: datetime
-    updated_at: datetime
-    workflow_state: str # todo: enum
-    data: None
-    statistics: None
+    ended_at: Optional[datetime]  = Field(default=None)
+    updated_at: Optional[datetime]  = Field(default=None)
+    workflow_state: str
+    data: Optional[Any]  = Field(default=None)
+    statistics: Optional[Any]  = Field(default=None)
     progress: int
-    errors_attachment: None
-    user: None
-    processing_warnings: list
-    processing_errors: list
-    batch_mode: bool
-    batch_mode_term_id: int
-    multi_term_batch_mode: bool
-    skips_deletes: bool
-    override_sis_stickiness: bool
-    add_sis_stickiness: bool
-    diffing_data_set_identifier: str
-    diffed_against_import_id: int
-    csv_attachments: list
+    errors_attachment: Optional[Any]  = Field(default=None)
+    user: Optional[Any]  = Field(default=None)
+    processing_warnings: Optional[list] = Field(default=[])
+    processing_errors: list = Field(default=[])
+    batch_mode: Optional[bool] = Field(default=None)
+    batch_mode_term_id: Optional[int] = Field(default=None)
+    multi_term_batch_mode: Optional[bool] = Field(default=False)
+    skips_deletes: Optional[bool] = Field(default=False)
+    override_sis_stickiness: Optional[bool] = Field(default=False)
+    add_sis_stickiness: Optional[bool] = Field(default=False)
+    diffing_data_set_identifier: Optional[str]  = Field(default=None)
+    diffed_against_import_id: Optional[int]  = Field(default=None)
+    csv_attachments: list = Field(default=[])
 
 class SISUserObject(BaseModel):
     """
@@ -42,7 +42,8 @@ class SISUserObject(BaseModel):
     last_name: Optional[str] = Field(default=None)
     first_name: Optional[str] = Field(default=None)
     short_name: Optional[str] = Field(default=None)
-    sis_user_id: str = Field(description="SIS User ID, defaulted as login email")
+    # NOTE sis_user_id optional to account for None cases in production (consider manual fix)
+    sis_user_id: Optional[str] = Field(description="SIS User ID, defaulted as login email")
     sis_import_id: Optional[int] = Field(default=None)
     integration_id: Optional[str] = Field(default=None)
     login_id: Optional[str] = Field(default=None)

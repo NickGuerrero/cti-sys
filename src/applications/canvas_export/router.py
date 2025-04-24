@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from pymongo.database import Database
 
-from src.applications.canvas_export.schemas import CanvasExportResponse
 from src.applications.canvas_export.service import add_applicants_to_canvas
 from src.database.mongo.core import get_mongo
 
