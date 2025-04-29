@@ -8,22 +8,28 @@ from typing import Dict, List
 import requests
 
 from src.applications.canvas_export.constants import EnrollmentRole, EnrollmentStatus, UserStatus
-from src.applications.canvas_export.schemas import SISImportObject, SISUserObject
+from src.applications.canvas_export.schemas import CanvasExportResponse, SISImportObject, SISUserObject
 from src.applications.canvas_export.utils import get_canvas_access_token, get_csv_as_tmp_file
 from src.applications.models import ApplicationModel
 from src.config import APPLICATIONS_COLLECTION, settings
 
 def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]:
     """
-    Get Application documents from Mongo collection.
+    Get unenrolled Application documents from Mongo collection.
 
     This function finds Application documents as ApplicationModel objects and returns them as a list.
-    HTTPException is raised if there is a DB error or no Applications are found.
+    HTTPException is raised if there is a DB error or no Applications are found. Finds documents
+    either not added to Canvas or not enrolled in Unterview.
     """
     application_collection = db.get_collection(APPLICATIONS_COLLECTION)
-    applications_cursor = application_collection.find({"canvas_id": None})
+    applications_cursor = application_collection.find({
+        "$or": [
+            {"canvas_id": None},
+            {"added_unterview_course": False}
+        ]
+    })
 
-    application_documents = applications_cursor.to_list()
+    application_documents = list(applications_cursor)
     if len(application_documents) == 0:
         raise HTTPException(status_code=404, detail=f"No unenrolled applicants found.")
     
@@ -31,7 +37,7 @@ def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]
 
 def generate_users_csv(application_documents: List[ApplicationModel] = []) -> str:
     """
-    Converts ApplicationModel list into CSV stream data following Canvas' Users.csv format.
+    Converts ApplicationModel list into CSV stream data following SIS Users.csv format.
     """
     users_csv_headers = [
         "user_id",
@@ -103,7 +109,7 @@ def generate_unterview_enrollments_csv(application_documents: List[ApplicationMo
     
     return csv_full_path
 
-def send_sis_csv(csv: str) -> SISImportObject:
+def send_sis_csv(csv: str, timeout_seconds: int) -> SISImportObject:
     """
     Sends CSV file to Canvas API, updating respective data.
 
@@ -129,7 +135,18 @@ def send_sis_csv(csv: str) -> SISImportObject:
     }
     url = f"{test_url}/api/v1/accounts/1/sis_imports/{initial_import.id}"
 
+    return poll_import_result(url, headers, timeout_seconds)
+
+def poll_import_result(
+    url: str,
+    headers: dict,
+    timeout_seconds: int
+) -> SISImportObject:
+    """
+    Polls the SIS Import API while the import progresses and until completion.
+    """
     start_time = time()
+
     while True:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -143,12 +160,12 @@ def send_sis_csv(csv: str) -> SISImportObject:
         if progress == 100:
             break
 
-        if time() - start_time > 60:
-            raise TimeoutError(f"SIS import {data.id} did not complete within {60} seconds")
+        if time() - start_time > timeout_seconds:
+            raise TimeoutError(f"SIS import {data.id} did not complete within {timeout_seconds} seconds")
 
         sleep(2)
-
     return SISImportObject(**response.json())
+
 
 def get_unterview_enrollments() -> List[SISUserObject]:
     """
@@ -179,7 +196,7 @@ def patch_applicants_with_unterview(
     batch_date: datetime
 ) -> int:
     """
-    Updates Application documents in-place and bulk writes to MongoDB.
+    Updates Application documents list in-place and bulk writes to MongoDB.
 
     This function updates the application_documents parameter passed in-place, and
     it returns the number of successfully modified documents from the DB bulk_write.
@@ -220,54 +237,46 @@ def patch_applicants_with_unterview(
     
     return db.get_collection(APPLICATIONS_COLLECTION).bulk_write(write_operations).modified_count
 
-def add_applicants_to_canvas(db: Database):
+def add_applicants_to_canvas(
+    db: Database,
+    timeout_seconds: int
+) -> CanvasExportResponse:
     """
     Entry function for adding applicants to Canvas and the Unterview course.
     """
-    # return get_unterview_enrollments()
-    
+    initialization_time = perf_counter()    
     batch_date = datetime.now(timezone.utc)
 
     # fetch documents
-    t1 = perf_counter()
     application_documents = get_unenrolled_application_documents(db=db)
-    print(f"Elapsed to grab documents: {perf_counter() - t1:.2f}s")
 
     # generate and send CSVs (users.csv and enrollments.csv)
-    t2 = perf_counter()
     users_csv = generate_users_csv(application_documents=application_documents)
-    print(f"Elapsed to generate users csv: {perf_counter() - t2:.2f}s")
-
-    t3 = perf_counter()
     enrollments_csv = generate_unterview_enrollments_csv(application_documents=application_documents)
-    print(f"Elapsed to generate enrollments csv: {perf_counter() - t3:.2f}s")
 
-    t4 = perf_counter()
-    send_sis_csv(csv=users_csv)
-    print(f"Elapsed to send users csv: {perf_counter() - t4:.2f}s")
-
-    t5 = perf_counter()
-    send_sis_csv(csv=enrollments_csv)
-    print(f"Elapsed to send enrollments csv: {perf_counter() - t5:.2f}s")
+    users_import = send_sis_csv(csv=users_csv, timeout_seconds=timeout_seconds)
+    enrollments_import = send_sis_csv(csv=enrollments_csv, timeout_seconds=timeout_seconds)
 
     # delete temp csv files
     os.remove(users_csv)
     os.remove(enrollments_csv)
 
     # fetch enrollments for current section
-    t6 = perf_counter()
     unterview_enrollments = get_unterview_enrollments()
-    print(f"Elapsed to get enrollments: {perf_counter() - t6:.2f}s")
 
     # update documents with Canvas information
-    t7 = perf_counter()
-    patch_applicants_with_unterview(
+    updated_applications_count = patch_applicants_with_unterview(
         db=db,
         application_documents=application_documents,
         unterview_enrollments=unterview_enrollments,
         batch_date=batch_date
     )
-    print(f"Elapsed to patch applicant documents: {perf_counter() - t7:.2f}s")
 
-    # respond with success, number of updated documents, batch date
-    return {"success": True}
+    return {
+        "success": True,
+        "applicants_enrolled": updated_applications_count,
+        "users_import_id": users_import.id,
+        "enrollments_import_id": enrollments_import.id,
+        "batch_date": batch_date,
+        "elapsed_time": f"{perf_counter() - initialization_time:.2f}s"
+    }

@@ -58,5 +58,24 @@ class SISUserObject(BaseModel):
     pronouns: Optional[str] = Field(default=None)
 
 class CanvasExportResponse(BaseModel):
-    # todo: define with known call responses
-    pass
+    success: bool
+    applicants_enrolled: int
+    users_import_id: int
+    enrollments_import_id: int
+    batch_date: datetime
+    elapsed_time: str
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "success": True,
+                    "applicants_enrolled": 9,
+                    "users_import_id": 126,
+                    "enrollments_import_id": 127,
+                    "batch_date": "2025-04-25T06:28:12.770Z",
+                    "elapsed_time": "21.53s"
+                }
+            ]
+        }
+    }
