@@ -4,11 +4,9 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from src.database.postgres.core import make_session
-from src.accelerate.process_attendance.service import process_accelerate_metrics
-
+from src.students.accelerate.process_attendance.service import process_accelerate_metrics
 
 router = APIRouter()
-
 
 @router.post("", status_code=status.HTTP_200_OK)
 def process_accelerate_attendance(db: Session = Depends(make_session)) -> Dict[str, int]:

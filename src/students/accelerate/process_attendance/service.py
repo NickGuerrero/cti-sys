@@ -8,19 +8,18 @@ from sqlalchemy.orm import Session, joinedload
 
 from src.database.postgres.models import Accelerate, Attendance, StudentAttendance
 
-
 def process_accelerate_metrics(db: Session) -> Dict[str, int]:
     """
     Process every active Accelerate record and store fresh participation metrics.
 
-    Steps performed
+    Steps performed:
     1. Fetch rows in accelerate where active is True.
     2. Pull raw session scores for those students.
     3. Aggregate the data by week.
     4. Compute four metrics per student and write them back.
     5. Commit the transaction.
 
-    Returns a small status payload for the API layer.
+    Always returns { status = 200, students_updated = int}.
     """
     acc_rows = load_active_accelerate_records(db)
     attend_rows = load_attendance_rows(db, [a.cti_id for a in acc_rows])
@@ -230,6 +229,7 @@ def metrics_for_student(
         "participation_streak": streak,
         "inactive_weeks": inactive,
     }
+
 
 def update_accelerate_records(
     db: Session,
