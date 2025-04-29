@@ -19,7 +19,7 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
     4. Compute four metrics per student and write them back.
     5. Commit the transaction.
 
-    Always returns { status = 200, students_updated = int}.
+    Always returns { status = 200, records_updated = int}.
     """
     acc_rows = load_active_accelerate_records(db)
     attend_rows = load_attendance_rows(db, [a.cti_id for a in acc_rows])
@@ -28,7 +28,7 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
     updated = update_accelerate_records(db, acc_rows, per_student)
 
     db.commit()
-    return {"status": 200, "students_updated": updated}
+    return {"status": 200, "records_updated": updated}
 
 
 def load_active_accelerate_records(db: Session) -> List[Accelerate]:

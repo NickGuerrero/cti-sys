@@ -13,7 +13,7 @@ class TestProcessAccelerateAttendance:
         """
         Simulate a case where two active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written, and the transaction is committed.
-            - The route returns {status: 200, students_updated: 2}.
+            - The route returns {status: 200, records_updated: 2}.
             - The database is modified.
             - The attendance rows are not empty.
         """
@@ -43,7 +43,7 @@ class TestProcessAccelerateAttendance:
 
         res = client.post("/api/students/accelerate/process-attendance")
         assert res.status_code == 200
-        assert res.json() == {"status": 200, "students_updated": 2}
+        assert res.json() == {"status": 200, "records_updated": 2}
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.rollback.assert_not_called()
         assert acc_1.participation_score == 1.0
@@ -54,7 +54,7 @@ class TestProcessAccelerateAttendance:
         """
         Simulate a case where no active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written,
-            - One commit occurs, and the route returns {status: 200, students_updated: 0}.
+            - One commit occurs, and the route returns {status: 200, records_updated: 0}.
             - The database is not modified.
             - The attendance rows are empty.
         """
@@ -66,7 +66,7 @@ class TestProcessAccelerateAttendance:
 
         res = client.post("/api/students/accelerate/process-attendance")
         assert res.status_code == 200
-        assert res.json() == {"status": 200, "students_updated": 0}
+        assert res.json() == {"status": 200, "records_updated": 0}
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.rollback.assert_not_called()
 

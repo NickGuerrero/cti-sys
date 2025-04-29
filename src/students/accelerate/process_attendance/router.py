@@ -14,7 +14,7 @@ def process_accelerate_attendance(db: Session = Depends(make_session)) -> Dict[s
     Main endpoint: Process student_attendance into Accelerate level participation metrics
     and write results into the accelerate table for all active students.
 
-    Always return { status = 200, students_updated = int}.
+    Always return { status = 200, records_updated = int}.
     On failure rolls back the transaction and send an HTTP-500 error.
     """
     # return process_accelerate_metrics(db)
