@@ -5,7 +5,7 @@ from pymongo import MongoClient
 import pytest
 from sqlalchemy.orm import Session
 
-from src.config import MONGO_DATABASE_NAME
+from src.config import MONGO_DATABASE_NAME, settings
 from src.database.mongo.core import get_mongo
 from src.database.mongo.service import init_collections
 from src.database.postgres.core import make_session
@@ -52,3 +52,11 @@ def mock_postgresql_db():
     app.dependency_overrides[make_session] = lambda: db
     yield db
     app.dependency_overrides.pop(make_session)
+
+@pytest.fixture(scope="session", autouse=True)
+def global_canvas_api_url_override():
+    """Fixture to override the Canvas URL in favor of the test environment"""
+    canvas_api_url = settings.canvas_api_url
+    settings.canvas_api_url = settings.canvas_api_test_url
+    yield
+    settings.canvas_api_url = canvas_api_url

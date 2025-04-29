@@ -6,22 +6,18 @@ import pytest
 
 from src.applications.canvas_export.schemas import CanvasExportResponse
 from src.applications.models import ApplicationModel
-from src.config import APPLICATIONS_COLLECTION, settings
+from src.config import APPLICATIONS_COLLECTION
 from src.main import app
 
 client = TestClient(app)
 
 class TestCanvasExport:
     @pytest.mark.integration
-    def test_add_applicants_to_canvas(self, monkeypatch, real_mongo_db: MongoDatabase):
+    def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase):
         """
         Integration test validating a successful external API interaction and handling.
         """
         # NOTE do we create a dummy canvas course and section?
-
-        # 1. Set Canvas API url to test environment
-        monkeypatch.setattr(settings, "canvas_api_url", settings.canvas_api_test_url)
-
         test_applications_collection = real_mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
         # 2. Add applications to test MongoDB
