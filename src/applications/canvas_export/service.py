@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 import os
-from time import perf_counter, sleep, time
 from fastapi import HTTPException
 from pymongo import UpdateOne
 from pymongo.database import Database
+from time import perf_counter, sleep, time
 from typing import Dict, List
 import requests
 

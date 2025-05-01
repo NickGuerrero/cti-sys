@@ -60,3 +60,4 @@ def global_canvas_api_url_override():
     settings.canvas_api_url = settings.canvas_api_test_url
     yield
     settings.canvas_api_url = canvas_api_url
+    

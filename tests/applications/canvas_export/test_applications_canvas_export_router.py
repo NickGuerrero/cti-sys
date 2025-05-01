@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 from pymongo.database import Database as MongoDatabase
 import pytest
 
@@ -16,8 +15,9 @@ class TestCanvasExport:
     def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase):
         """
         Integration test validating a successful external API interaction and handling.
+
+        Test utilizes overridden Canvas API URL linked to the test environment.
         """
-        # NOTE do we create a dummy canvas course and section?
         test_applications_collection = real_mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
         # 2. Add applications to test MongoDB
@@ -97,7 +97,7 @@ class TestCanvasExport:
                 (unenrolled for unenrolled in applications if unenrolled.email == newly_enrolled_application.email),
             None)
 
-            # verify state of non-related attributes are unchanged
+            # verify state of attributes not related to the export are unchanged
             assert unenrolled_application.fname == newly_enrolled_application.fname
             assert unenrolled_application.lname == newly_enrolled_application.lname
 
@@ -106,5 +106,3 @@ class TestCanvasExport:
             time_delta = abs(newly_enrolled_application.last_batch_update.replace(tzinfo=timezone.utc) - import_data.batch_date)
             assert time_delta < timedelta(milliseconds=100)
             assert newly_enrolled_application.canvas_id is not None
-
-        # NOTE could make a call to Canvas to make sure that these actions succeeded
