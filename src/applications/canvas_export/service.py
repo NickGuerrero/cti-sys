@@ -153,9 +153,6 @@ def poll_import_result(
         data = SISImportObject(**response.json())
 
         progress = data.progress
-        state = data.workflow_state
-
-        print(f"Import {data.id}: {progress}% - {state}")
 
         if progress == 100:
             break
