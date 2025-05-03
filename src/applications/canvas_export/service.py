@@ -15,10 +15,10 @@ from src.config import APPLICATIONS_COLLECTION, settings
 
 def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]:
     """
-    Get unenrolled Application documents from Mongo collection.
+    Get unenrolled Application documents from MongoDB collection.
 
     This function finds Application documents as ApplicationModel objects and returns them as a list.
-    HTTPException is raised if there is a DB error or no Applications are found. Finds documents
+    HTTPException is raised if there is a DB error or no Applications are found. Finds applicants
     either not added to Canvas or not enrolled in Unterview.
     """
     application_collection = db.get_collection(APPLICATIONS_COLLECTION)
@@ -37,7 +37,9 @@ def get_unenrolled_application_documents(db: Database) -> List[ApplicationModel]
 
 def generate_users_csv(application_documents: List[ApplicationModel] = []) -> str:
     """
-    Converts ApplicationModel list into CSV stream data following SIS Users.csv format.
+    Converts ApplicationModel list into named CSV file following SIS Users.csv format.
+
+    File is stored in the operating system's temporary files directory.
     """
     users_csv_headers = [
         "user_id",
@@ -77,7 +79,9 @@ def generate_users_csv(application_documents: List[ApplicationModel] = []) -> st
 
 def generate_unterview_enrollments_csv(application_documents: List[ApplicationModel] = []) -> str:
     """
-    Converts ApplicationModel list into CSV stream data following Canvas' Enrollments.csv format.
+    Converts ApplicationModel list into named CSV file following SIS Enrollments.csv format.
+
+    File is stored in the operating system's temporary files directory.
     """
     
     enrollments_csv_headers = [
@@ -115,7 +119,7 @@ def send_sis_csv(csv: str, timeout_seconds: int) -> SISImportObject:
 
     This function requires the working thread to wait for import resolving to `"progress": "100"`
     """
-    test_url = settings.canvas_api_url
+    url = settings.canvas_api_url
     headers = {
         "Authorization": f"Bearer {get_canvas_access_token()}",
         "Content-Type": "text/csv"
@@ -123,7 +127,7 @@ def send_sis_csv(csv: str, timeout_seconds: int) -> SISImportObject:
 
     with open(csv, "rb") as file:
         response = requests.post(
-            url=f"{test_url}/api/v1/accounts/1/sis_imports?extension=csv",
+            url=f"{url}/api/v1/accounts/1/sis_imports?extension=csv",
             headers=headers,
             data=file
         )
@@ -133,17 +137,23 @@ def send_sis_csv(csv: str, timeout_seconds: int) -> SISImportObject:
     headers = {
         "Authorization": f"Bearer {get_canvas_access_token()}"
     }
-    url = f"{test_url}/api/v1/accounts/1/sis_imports/{initial_import.id}"
+    url = f"{url}/api/v1/accounts/1/sis_imports/{initial_import.id}"
 
     return poll_import_result(url, headers, timeout_seconds)
 
 def poll_import_result(
     url: str,
     headers: dict,
-    timeout_seconds: int
+    timeout_seconds: int,
+    poll_delay_seconds: int = 2
 ) -> SISImportObject:
     """
     Polls the SIS Import API while the import progresses and until completion.
+
+    - `timeout_seconds` - Number of seconds until the request polling breaks and raises
+    a TimeoutError.
+    - `poll_delay_seconds` - Optional argument for the length of time between each
+    progress-checking external request.
     """
     start_time = time()
 
@@ -160,7 +170,7 @@ def poll_import_result(
         if time() - start_time > timeout_seconds:
             raise TimeoutError(f"SIS import {data.id} did not complete within {timeout_seconds} seconds")
 
-        sleep(2)
+        sleep(poll_delay_seconds)
     return SISImportObject(**response.json())
 
 
@@ -169,7 +179,7 @@ def get_unterview_enrollments() -> List[SISUserObject]:
     Use Canvas API to get list of Users enrolled in Unterview.
 
     This function will respond with the list of Users enrolled as students
-    and under the current section.
+    and under the current Unterview section.
     NOTE: future implementation of course management may make a paginated API fetch
     using GET Course Students more optimal than a GET Section Info.
     """
@@ -202,7 +212,8 @@ def patch_applicants_with_unterview(
     # create dictionary mapping application_documents_email to index
     applicant_email_to_index: Dict[str, ApplicationModel] = {}
     for index_for_email in range(0, len(application_documents)):
-        applicant_email_to_index[application_documents[index_for_email].email] = index_for_email
+        applicant_email_at_index = application_documents[index_for_email].email
+        applicant_email_to_index[applicant_email_at_index] = index_for_email
 
     write_operations: List[UpdateOne] = []
 

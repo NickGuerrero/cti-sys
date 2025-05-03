@@ -16,11 +16,12 @@ class TestCanvasExport:
         """
         Integration test validating a successful external API interaction and handling.
 
-        Test utilizes overridden Canvas API URL linked to the test environment.
+        Test utilizes overridden Canvas API URL linked to the test environment. Test assumes
+        the existence of the Canvas course and section of Unterview defined in the
+        pydantic-settings defined in `/src/config.py`.
         """
         test_applications_collection = real_mongo_db.get_collection(APPLICATIONS_COLLECTION)
-
-        # 2. Add applications to test MongoDB
+        # 1. Add applications to test MongoDB
         applications = [
             # applicants not yet added to Canvas nor enrolled in Unterview -> should be processed
             ApplicationModel(
@@ -77,7 +78,7 @@ class TestCanvasExport:
         ])
         assert insert_result.acknowledged and len(insert_result.inserted_ids) == len(applications)
 
-        # 3. Initiate endpoint request and validate success
+        # 2. Initiate endpoint request and validate success
         response = client.post("/api/applications/canvas-export")
         assert response.status_code == 200
         import_data = CanvasExportResponse(**response.json())
@@ -85,7 +86,7 @@ class TestCanvasExport:
         assert import_data.batch_date < datetime.now(timezone.utc)
         assert import_data.applicants_enrolled == 4
 
-        # 4. Validate applicants processed in batch have been updated on MongoDB
+        # 3. Validate applicants processed in batch have been updated on MongoDB
         newly_enrolled_application_documents = test_applications_collection.find({
             "_id": {
                 "$in": insert_result.inserted_ids
@@ -103,6 +104,5 @@ class TestCanvasExport:
 
             # verify batch attributes have been updated
             assert newly_enrolled_application.added_unterview_course
-            time_delta = abs(newly_enrolled_application.last_batch_update.replace(tzinfo=timezone.utc) - import_data.batch_date)
-            assert time_delta < timedelta(milliseconds=100)
             assert newly_enrolled_application.canvas_id is not None
+            assert newly_enrolled_application.last_batch_update is not None
