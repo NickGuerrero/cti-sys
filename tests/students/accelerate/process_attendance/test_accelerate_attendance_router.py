@@ -149,7 +149,7 @@ class TestProcessAccelerateAttendance:
         assert round(weighted_low_decay, 2) == 0.78
         
 
-    def test_metrics_for_student_full_set(self):
+    def test_metrics_for_student_full_set(self, monkeypatch):
         """
         Two sessions this week (average 1.0) and one last week (0.5).
             - participation_score: 0.75
@@ -157,9 +157,22 @@ class TestProcessAccelerateAttendance:
             - participation_streak: 2
             - inactive_weeks: 0
         """
+        # Freeze today's date to a fixed date for testing
         today = date(2025, 4, 28)
-        w0 = today - timedelta(days=today.weekday())
-        w1 = w0 - timedelta(weeks=1)
+
+        # Mock the date.today() method to return a fixed date
+        # This is a workaround for the fact that date.today() is not easily mockable
+        # in the original code. We create a subclass of date and override the today() method.
+        # This allows us to control the current date for testing purposes.
+        class FakeDate(date):
+            @classmethod
+            def today(cls):
+                return today
+
+        monkeypatch.setattr(svc, "date", FakeDate)
+
+        w0 = today - timedelta(days=today.weekday())   # 2025‑04‑28 (Mon)
+        w1 = w0 - timedelta(weeks=1)                   # 2025‑04‑21 (Mon)
 
         rows = [(w0, 1.0), (w0, 1.0), (w1, 0.5)]
 
