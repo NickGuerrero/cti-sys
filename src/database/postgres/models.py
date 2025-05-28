@@ -41,7 +41,7 @@ class Student(Base):
     # Relationships
     email_addresses: Mapped[List["StudentEmail"]] = relationship(back_populates="email_owner", cascade="all, delete-orphan")
     canvas_id: Mapped["CanvasID"] = relationship(back_populates="id_owner", lazy="joined", cascade="all, delete-orphan")
-    ethnicities: Mapped[List["Ethnicity"]] = relationship(back_populates="eth_owner", lazy="joined", cascade="all, delete-orphan")
+    ethnicities: Mapped[List["Ethnicity"]] = relationship(back_populates="eth_owner", lazy="select", cascade="all, delete-orphan")
     accelerate_record: Mapped["Accelerate"] = relationship(back_populates="acc_owner", cascade="all, delete-orphan")
     # Note: Attendance relationship removed, use joins for explicit attendance processes
 
