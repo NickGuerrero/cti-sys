@@ -6,6 +6,9 @@ from bson import json_util
 
 from src.config import MONGO_DATABASE_NAME
 from src.database.mongo.service import init_collections
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=".env")
 
 MONGO_URL = environ.get("CTI_MONGO_URL")
 if not MONGO_URL:
