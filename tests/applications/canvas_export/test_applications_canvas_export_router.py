@@ -12,6 +12,7 @@ client = TestClient(app)
 
 class TestCanvasExport:
     @pytest.mark.integration
+    @pytest.mark.canvas
     def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase):
         """
         Integration test validating a successful external API interaction and handling.
