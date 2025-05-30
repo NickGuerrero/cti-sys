@@ -17,12 +17,15 @@ def create(*, application_create: ApplicationCreateRequest, db: Database) -> App
     extras = application_create.model_extra or {}
     for prop, value in extras.items():
         validated_with_extras[prop] = value
-    
+
     # set time of application submission
     validated_with_extras["app_submitted"] = datetime.now(timezone.utc)
 
+    # set default tracking attributes of application submission
+    application_with_defaults = ApplicationModel.model_validate(validated_with_extras)
+
     # insert the document with required and flexible form responses
-    app_result = application_collection.insert_one(validated_with_extras)
+    app_result = application_collection.insert_one(application_with_defaults.model_dump())
 
     created_app: ApplicationModel = application_collection.find_one({
         "_id": app_result.inserted_id

@@ -16,7 +16,7 @@ collections: dict[str, CollectionProps] = {
         schema={
             "bsonType": "object",
             "title": "Application Object Validation",
-            "required": ["email", "fname", "lname", "app_submitted"],
+            "required": ["email", "fname", "lname", "app_submitted", "canvas_id", "added_unterview_course", "next_steps_sent", "accessed_unterview", "commitment_quiz_completed", "master_added"],
             "properties": {
                 "email": {
                     "bsonType": "string",
@@ -37,6 +37,30 @@ collections: dict[str, CollectionProps] = {
                     "bsonType": "date",
                     "description": "Must provide the date at which the application was submitted as UTC datetime"
                 },
+                "canvas_id": {
+                    "bsonType": ["int", "null"],
+                    "description": "Must provide integer Canvas ID of applicant or set to null"
+                },
+                "added_unterview_course": {
+                    "bsonType": "bool",
+                    "description": "Must provide whether the applicant has been added as a CTI Canvas user as a boolean value"
+                },
+                "next_steps_sent": {
+                    "bsonType": "bool",
+                    "description": "Must provide whether the applicant has been sent their 'Next Steps' email as a boolean value"
+                },
+                "accessed_unterview": {
+                    "bsonType": "bool",
+                    "description": "Must provide whether the applicant has accessed unterview as a boolean value"
+                },
+                "commitment_quiz_completed": {
+                    "bsonType": "bool",
+                    "description": "Must provide whether the applicant has completed the commitment quiz as a boolean value"
+                },
+                "master_added": {
+                    "bsonType": "bool",
+                    "description": "Must provide whether the applicant has been added to the Master Roster as a boolean value"
+                }
             },
             "additionalProperties": True
         },
