@@ -151,3 +151,9 @@ class AccountabilityGroup(Base):
     group_name: Mapped[str] = mapped_column(String)
     student_accelerator: Mapped[str] = mapped_column(String)
     ag_students: Mapped[List["Accelerate"]] = relationship(back_populates="ag_record")
+
+class InactiveRequest(Base):
+    __tablename__ = "inactive_requests"
+    passkey: Mapped[int] = mapped_column(Integer, nullable=False, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
