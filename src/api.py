@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.applications.router import router as applications_router
+from src.applications.master_roster.router import router as applications_add_to_master_roster_router
 from src.students.alternate_emails.router import router as student_alternate_emails_router
 from src.students.attendance_log.router import router as student_attendence_log_router
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
@@ -11,6 +12,13 @@ api_router = APIRouter()
 api_router.include_router(
     applications_router,
     prefix="/applications",
+    tags=["Applications"]
+)
+
+# /api/applications/master-roster...
+api_router.include_router(
+    applications_add_to_master_roster_router,
+    prefix="/applications/add-to-master-roster",
     tags=["Applications"]
 )
 
