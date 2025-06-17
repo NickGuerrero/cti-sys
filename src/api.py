@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.applications.router import router as applications_router
+from src.applications.canvas_export.router import router as canvas_export_router
 from src.applications.master_roster.router import router as applications_add_to_master_roster_router
 from src.students.alternate_emails.router import router as student_alternate_emails_router
 from src.students.attendance_log.router import router as student_attendence_log_router
@@ -19,6 +20,13 @@ api_router.include_router(
 api_router.include_router(
     applications_add_to_master_roster_router,
     prefix="/applications/add-to-master-roster",
+    tags=["Applications"]
+)
+
+# /api/applications/canvas-export
+api_router.include_router(
+    canvas_export_router,
+    prefix="/applications/canvas-export",
     tags=["Applications"]
 )
 

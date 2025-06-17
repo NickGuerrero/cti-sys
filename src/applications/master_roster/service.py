@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.applications.master_roster.models import ApplicationWithMasterProps
-from src.applications.master_roster.schemas import MasterRosterCreateRequest
+from src.applications.master_roster.schemas import MasterRosterCreateRequest, MasterRosterCreateResponse
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION
 from src.database.postgres.models import Accelerate, CanvasID, Ethnicity, Student, StudentEmail
 from src.reports.accelerate_flex.models import AccelerateFlexBase
@@ -139,9 +139,21 @@ def create_master_roster_records(
             status_code=500,
             detail=f"Database failed to acknowledge flex insert for user with cti_id {application.canvas_id}"
         )
+    
+    # update the Application Collection document to acknowledge enrollment to Master Roster
+    update_result = application_collection.update_one({"email": applicant_email}, {
+        "$set": {"master_added": True}
+    })
+    if not update_result.acknowledged:
+        postgres_session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database failed to acknowledge update for user with email {applicant_email}"
+        )
 
     # if no errors occurred, commit the session transaction and respond with success status + message
     postgres_session.commit()
-
-    # if there were errors, rollback the transaction
-    pass
+    return MasterRosterCreateResponse(
+        status=201,
+        message=f"Successfully added user with email {applicant_email} to Master Roster"
+    )
