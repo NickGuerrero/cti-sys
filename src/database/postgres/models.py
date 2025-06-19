@@ -38,6 +38,9 @@ class Student(Base):
     birthday: Mapped[Optional[date]] = mapped_column(Date) # If null, assume student is at least 18
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     cohort_lc: Mapped[bool] = mapped_column(Boolean, default=False)
+    # New columns for Alembic migration
+    launch: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    ca_region: Mapped[Optional[str]] = mapped_column(String)
     # Relationships
     email_addresses: Mapped[List["StudentEmail"]] = relationship(back_populates="email_owner", cascade="all, delete-orphan")
     canvas_id: Mapped["CanvasID"] = relationship(back_populates="id_owner", lazy="joined", cascade="all, delete-orphan")
@@ -72,7 +75,6 @@ class Ethnicity(Base):
     __tablename__ = "ethnicities"
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
-    details: Mapped[Optional[str]] = mapped_column(String)
     eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
 
 ##################################
