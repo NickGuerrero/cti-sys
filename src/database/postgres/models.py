@@ -75,8 +75,6 @@ class Ethnicity(Base):
     __tablename__ = "ethnicities"
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
-    # Removed details column for Alembic migration
-    # details: Mapped[Optional[str]] = mapped_column(String)
     eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
 
 ##################################
