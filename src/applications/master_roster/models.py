@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Optional
-
 from pydantic import ConfigDict, Field
+
 from src.applications.models import ApplicationModel
 
 class ApplicationWithMasterProps(ApplicationModel):

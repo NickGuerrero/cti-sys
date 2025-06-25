@@ -11,8 +11,8 @@ router = APIRouter()
 
 @router.post(
     "",
-    description="Creates required records for adding Accelerate student to the Master Roster.",
-    response_description="Student added to the Master Roster",
+    description="Creates required records for adding Accelerate students to the Master Roster.",
+    response_description="Students added to the Master Roster",
     status_code=status.HTTP_201_CREATED,
     response_model=MasterRosterCreateResponse,
 )

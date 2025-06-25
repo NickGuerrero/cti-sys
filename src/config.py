@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     unterview_sis_course_id: str = "S161"
     current_unterview_sis_section_id: str = "S194" # NOTE had to manually define this in Canvas
     current_unterview_section_id: int = 194
-    canvas_api_url: str = "https://cti-courses.instructure.com"
+    course_id_101: int = 170
+    commitment_quiz_id: int = 2488
+    canvas_api_url: str = "https://cti-courses.test.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
 
     model_config = {
