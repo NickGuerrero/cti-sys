@@ -6,6 +6,8 @@ from src.applications.master_roster.router import router as applications_add_to_
 from src.students.alternate_emails.router import router as student_alternate_emails_router
 from src.students.attendance_log.router import router as student_attendence_log_router
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
+from src.students.missing_students.router import router as student_recover_attendance_router
+
 
 api_router = APIRouter()
 
@@ -49,4 +51,11 @@ api_router.include_router(
     accelerate_attendance_record_router,
     prefix="/students/accelerate/process-attendance",
     tags=["Accelerate"]
+)
+
+# /api/students/recover-attendance...
+api_router.include_router(
+    student_recover_attendance_router,
+    prefix="/students/recover-attendance",
+    tags=["Students"]
 )

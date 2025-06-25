@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 
 from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
@@ -16,10 +17,23 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from src.app.models.postgres import models
+from src.database.postgres import models
 target_metadata = models.Base.metadata
+
+# map Alembic environment names to DB URLs
+DB_URLS = {
+    "development": os.getenv("DEV_DATABASE_URL"),
+    "production": os.getenv("PROD_DATABASE_URL"),
+    "custom": os.getenv("CUSTOM_DATABASE_URL"),
+}
+
+def get_url() -> str:
+    # Alembic Command line: alembic -x environment=development
+    env_name = config.get_main_option("environment") or "development"
+    url = DB_URLS.get(env_name)
+    if not url:
+        raise RuntimeError(f"No database URL configured for environment '{env_name}'")
+    return url
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -61,12 +75,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    connectable = create_engine(env_url())
+    connectable = create_engine(get_url(), poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(
