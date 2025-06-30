@@ -33,7 +33,7 @@ def create_master_roster_records(
         application_collection=application_collection,
         applications_dict=applications_dict
     )
-    
+
     duplicate_ids_count = remove_duplicate_applicants(
         applications_dict=applications_dict,
         postgres_session=postgres_session
@@ -59,7 +59,8 @@ def create_master_roster_records(
     postgres_session.commit()
     return MasterRosterCreateResponse(
         status=201,
-        message=f"Successfully added users to Master Roster" # TODO desc spec
+        message=f"Successfully added users to Master Roster {students}", # TODO desc spec
+        testing="none"
     )
 
 def get_all_quiz_submissions() -> dict[int, QuizSubmission]:
@@ -127,7 +128,7 @@ def get_valid_applications(
         except ValidationError as e:
             # NOTE log details when able
             invalid_applications_count += 1
-
+    return (applications_dict, invalid_applications_count)
 
 def update_applicant_docs_commitment_status(
     application_collection: Collection,
@@ -210,7 +211,7 @@ def application_to_student(application: ApplicationWithMasterProps) -> Student:
             Ethnicity(
                 cti_id=application.canvas_id,
                 ethnicity=ethnicity,
-            ) for ethnicity in application.race_ethnicity
+            ) for ethnicity in application.race_ethnicity or []
         ],
         accelerate_record=Accelerate(
             cti_id=application.canvas_id,
