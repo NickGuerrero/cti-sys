@@ -28,7 +28,7 @@ class TestCheckActivity:
             }
         }
 
-        response = client.post("/api/students/activity/check-activity?program=accelerate", json=request_data)
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
         assert response.status_code == 200
         assert response.json() == {"status": 200}
         mock_db.commit.assert_called_once()
@@ -54,7 +54,7 @@ class TestCheckActivity:
             }
         }
 
-        response = client.post("/api/students/activity/check-activity?program=accelerate", json=request_data)
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
         assert response.status_code == 200
         assert response.json() == {"status": 200}
         mock_db.commit.assert_called_once()
@@ -92,7 +92,7 @@ class TestCheckActivity:
             }
         }
 
-        response = client.post("/api/students/activity/check-activity?program=accelerate", json=request_data)
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
         assert response.status_code == 200
         assert response.json() == {"status": 200}
         mock_db.commit.assert_called_once()
@@ -121,7 +121,7 @@ class TestCheckActivity:
             }
         }
 
-        response = client.post("/api/students/activity/check-activity?program=accelerate", json=request_data)
+        response = client.post("/api/students/check-activity?program=accelerate", json=request_data)
 
         assert response.status_code == 500
         assert "Database error" in response.json()["detail"]

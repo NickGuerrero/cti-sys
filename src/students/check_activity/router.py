@@ -4,12 +4,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.database.postgres.core import make_session
-from src.students.activity.service import process_student_activity
-from src.students.activity.schemas import CheckActivityRequest, CheckActivityResponse
+from src.students.check_activity.service import process_student_activity
+from src.students.check_activity.schemas import CheckActivityRequest, CheckActivityResponse
 
 router = APIRouter()
 
-@router.post("/check-activity", response_model=CheckActivityResponse)
+@router.post("", response_model=CheckActivityResponse)
 def check_activity(
     request: CheckActivityRequest,
     program: str = Query(..., description="The associated program."),
