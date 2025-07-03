@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple
+from typing import List, Tuple
 from fastapi import HTTPException
 from pydantic import ValidationError
 from pymongo import UpdateOne
@@ -6,20 +6,27 @@ from pymongo.collection import Collection
 from pymongo.database import Database as MongoDatabase
 from requests import get
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.applications.canvas_export.utils import get_canvas_access_token
 from src.applications.master_roster.models import ApplicationWithMasterProps
-from src.applications.master_roster.schemas import MasterRosterCreateRequest, MasterRosterCreateResponse, QuizSubmission
+from src.applications.master_roster.schemas import MasterRosterCreateResponse, QuizSubmission
 from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, settings
 from src.database.postgres.models import Accelerate, CanvasID, Ethnicity, Student, StudentEmail
 from src.reports.accelerate_flex.models import AccelerateFlexBase
 
 def create_master_roster_records(
-    master_roster_create_request: MasterRosterCreateRequest,
     mongo_db: MongoDatabase,
     postgres_session: Session
-):
+) -> MasterRosterCreateResponse:
+    """
+    Entry function for adding applicants to Master Roster.
+
+    Applicant batch is based on students having submitted the Commitment Quiz. Applicant data is
+    validated, records are added to PostgreSQL, and flex attributes are saved to the Accelerate
+    Flex MongoDB collection.
+    """
     user_submissions_dict = get_all_quiz_submissions()
 
     application_collection = mongo_db.get_collection(APPLICATIONS_COLLECTION)
@@ -39,10 +46,10 @@ def create_master_roster_records(
         postgres_session=postgres_session
     )
 
-    # add each remaining applications_dict value as a Student record TODO try wrap
-    students = [application_to_student(app) for app in applications_dict.values()]
-    postgres_session.add_all(students)
-    postgres_session.flush()
+    add_all_students(
+        applications_dict=applications_dict,
+        postgres_session=postgres_session
+    )
 
     create_applicant_flex_documents(
         applications_dict=applications_dict,
@@ -50,7 +57,7 @@ def create_master_roster_records(
         postgres_session=postgres_session
     )
     
-    update_applicant_docs_master_added(
+    updated_docs_count = update_applicant_docs_master_added(
         applications_dict=applications_dict,
         application_collection=application_collection,
         postgres_session=postgres_session
@@ -59,8 +66,7 @@ def create_master_roster_records(
     postgres_session.commit()
     return MasterRosterCreateResponse(
         status=201,
-        message=f"Successfully added users to Master Roster {students}", # TODO desc spec
-        testing="none"
+        message=f"Successfully added {updated_docs_count} users to Master Roster",
     )
 
 def get_all_quiz_submissions() -> dict[int, QuizSubmission]:
@@ -135,6 +141,11 @@ def update_applicant_docs_commitment_status(
     applications_dict: dict[int, ApplicationWithMasterProps]
 ) -> None:
     """
+    Function updates the Application collection documents acknowledging their
+    addition to the Master Roster.
+
+    MongoDB updates write based on bulk_write with `ordered=False`, meaning writes will continue
+    despite encountered failures with reporting back (each update is independent).
     """
     # update application documents to reflect a submitted commitment quiz
     application_updates: List[UpdateOne] = []
@@ -159,6 +170,10 @@ def remove_duplicate_applicants(
     postgres_session: Session
 ) -> int:
     """
+    Function pops applications that are found already inserted in the PostgreSQL database and
+    returns the number of duplicates found.
+
+    Raises error if no applications exist after filter (all commitments are of duplicate inserts).
     """
     # validate that the users have not committed already from PostreSQL -> else don't process again
     select_student_ids_stmt = (
@@ -188,17 +203,12 @@ def application_to_student(application: ApplicationWithMasterProps) -> Student:
         fname=application.fname,
         pname=application.pname,
         lname=application.lname,
-        # 'join_date' default set by DB
         target_year=application.app_submitted.year, # FIXME change to base on month and year
         gender=application.gender,
         first_gen=application.first_gen,
         institution=application.institution,
-        # 'is_graduate' default set
         birthday=application.birthday,
-        # ca_region TODO this is missing from the DB, notes suggest not needed
-        # 'active' default set
-        # 'cohort_lc' default set
-        # launch TODO this is missing from the DB, notes suggest not needed
+        ca_region=application.ca_region,
         email_addresses=[
             StudentEmail(
                 email=application.email,
@@ -215,16 +225,7 @@ def application_to_student(application: ApplicationWithMasterProps) -> Student:
         ],
         accelerate_record=Accelerate(
             cti_id=application.canvas_id,
-            # 'student_type' default set
-            # accountability_group
-            # accountability_team
-            # pathway_goal
-            # 'participation_score' default set
-            # 'sessions_attended' default set
-            # 'participation_streak' default set
             returning_student=application.returning,
-            # 'inactive_weeks' default set
-            # 'active' default set
         ),
     )
     return student
@@ -252,6 +253,11 @@ def update_applicant_docs_master_added(
         postgres_session: Session
 ):
     """
+    Function updates the Application collection documents acknowledging their
+    addition to the Master Roster.
+
+    MongoDB updates write based on bulk_write with `ordered=False`, meaning writes will continue
+    despite encountered failures with reporting back (each update is independent).
     """
     application_updates: List[UpdateOne] = []
     for user_canvas_id, _ in applications_dict.items():
@@ -263,12 +269,31 @@ def update_applicant_docs_master_added(
                 }}
             )
         )
+
+    update_result = application_collection.bulk_write(application_updates, ordered=False)
     
-    if not application_collection.bulk_write(application_updates).acknowledged:
+    if not update_result.acknowledged:
         postgres_session.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Database failed to acknowledge bulk applications master_added update"
+        )
+    
+    return update_result.modified_count
+
+def add_all_students(
+    applications_dict: dict[int, ApplicationWithMasterProps],
+    postgres_session: Session
+):
+    try:
+        students = [application_to_student(app) for app in applications_dict.values()]
+        postgres_session.add_all(students)
+        postgres_session.flush()
+    except SQLAlchemyError as e:
+        postgres_session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"PostgreSQL Database error: {str(e)}"
         )
 
 def create_applicant_flex_documents(
@@ -277,11 +302,16 @@ def create_applicant_flex_documents(
     postgres_session: Session
 ):
     """
+    Function takes list of ApplicationWithMasterProps objects and inserts data into
+    MongoDB Accelerate Flex collection.
+
+    Insert will fail if ApplicationWithMasterProps attributes do not satisfy Accelerate Flex
+    jsonSchema properties. Insert call uses `ordered=False` to skip insertion failures.
     """
     flex_model_dicts = [application_to_flex(app).model_dump() for app in applications_dict.values()]
 
     accelerate_flex_collection = mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION)
-    insert_result = accelerate_flex_collection.insert_many(flex_model_dicts)
+    insert_result = accelerate_flex_collection.insert_many(flex_model_dicts, ordered=False)
     if not insert_result.acknowledged:
         postgres_session.rollback()
         raise HTTPException(

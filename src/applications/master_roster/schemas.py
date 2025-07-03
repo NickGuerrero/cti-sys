@@ -1,15 +1,11 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 from pydantic import BaseModel
-
-class MasterRosterCreateRequest(BaseModel):
-    pass
 
 class MasterRosterCreateResponse(BaseModel):
     status: int
     message: str
-    testing: Any # TODO remove before commit
 
 class QuizSubmissionWorkflowState(Enum):
     UNTAKEN = "untaken"
