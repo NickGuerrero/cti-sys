@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from pymongo.database import Database
+from pymongo.client_session import ClientSession as MongoSession
 
 from src.api import api_router
-from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mongo
+from src.database.mongo.core import close_mongo, get_mongo, init_mongo, make_mongo_session, ping_mongo
 from src.database.postgres.core import make_session
 from src.database.postgres.models import Student
 from src.students.models import StudentDTO

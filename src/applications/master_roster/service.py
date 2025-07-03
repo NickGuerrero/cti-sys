@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from pymongo import UpdateOne
 from pymongo.collection import Collection
+from pymongo.client_session import ClientSession as MongoSession
 from pymongo.database import Database as MongoDatabase
 from requests import get
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from src.reports.accelerate_flex.models import AccelerateFlexBase
 
 def create_master_roster_records(
     mongo_db: MongoDatabase,
+    mongo_session: MongoSession,
     postgres_session: Session
 ) -> MasterRosterCreateResponse:
     """
@@ -27,17 +29,21 @@ def create_master_roster_records(
     validated, records are added to PostgreSQL, and flex attributes are saved to the Accelerate
     Flex MongoDB collection.
     """
+    mongo_session.start_transaction()
+
     user_submissions_dict = get_all_quiz_submissions()
 
     application_collection = mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
     applications_dict, invalid_applications_count = get_valid_applications(
         application_collection=application_collection,
+        mongo_session=mongo_session,
         user_submissions_dict=user_submissions_dict
     )
 
     update_applicant_docs_commitment_status(
         application_collection=application_collection,
+        mongo_session=mongo_session,
         applications_dict=applications_dict
     )
 
@@ -54,16 +60,19 @@ def create_master_roster_records(
     create_applicant_flex_documents(
         applications_dict=applications_dict,
         mongo_db=mongo_db,
+        mongo_session=mongo_session,
         postgres_session=postgres_session
     )
     
     updated_docs_count = update_applicant_docs_master_added(
         applications_dict=applications_dict,
         application_collection=application_collection,
+        mongo_session=mongo_session,
         postgres_session=postgres_session
     )
 
     postgres_session.commit()
+    mongo_session.commit_transaction()
     return MasterRosterCreateResponse(
         status=201,
         message=f"Successfully added {updated_docs_count} users to Master Roster",
@@ -107,6 +116,7 @@ def get_all_quiz_submissions() -> dict[int, QuizSubmission]:
 
 def get_valid_applications(
     application_collection: Collection,
+    mongo_session: MongoSession,
     user_submissions_dict: dict[int, QuizSubmission]
 ) -> Tuple[dict[int, ApplicationWithMasterProps], int]:
     """
@@ -122,7 +132,7 @@ def get_valid_applications(
             {"canvas_id": {"$in": list(user_submissions_dict.keys())}},
             {"master_added": False}
         ]
-    })
+    }, session=mongo_session)
 
     # validate the state of the application documents to be referenced
     applications_dict: dict[int, ApplicationWithMasterProps] = {}
@@ -138,6 +148,7 @@ def get_valid_applications(
 
 def update_applicant_docs_commitment_status(
     application_collection: Collection,
+    mongo_session: MongoSession,
     applications_dict: dict[int, ApplicationWithMasterProps]
 ) -> None:
     """
@@ -147,7 +158,6 @@ def update_applicant_docs_commitment_status(
     MongoDB updates write based on bulk_write with `ordered=False`, meaning writes will continue
     despite encountered failures with reporting back (each update is independent).
     """
-    # update application documents to reflect a submitted commitment quiz
     application_updates: List[UpdateOne] = []
     for user_canvas_id, _ in applications_dict.items():
         application_updates.append(
@@ -158,8 +168,13 @@ def update_applicant_docs_commitment_status(
                 }}
             )
         )
-    
-    if not application_collection.bulk_write(application_updates).acknowledged:
+    update_result = application_collection.bulk_write(
+        requests=application_updates,
+        session=mongo_session,
+        ordered=False
+    )
+
+    if not update_result.acknowledged:
         raise HTTPException(
             status_code=500,
             detail=f"Database failed to acknowledge bulk applications commitment update"
@@ -250,6 +265,7 @@ def application_to_flex(application: ApplicationWithMasterProps) -> AccelerateFl
 def update_applicant_docs_master_added(
         applications_dict: dict[int, ApplicationWithMasterProps],
         application_collection: Collection,
+        mongo_session: MongoSession,
         postgres_session: Session
 ):
     """
@@ -270,7 +286,11 @@ def update_applicant_docs_master_added(
             )
         )
 
-    update_result = application_collection.bulk_write(application_updates, ordered=False)
+    update_result = application_collection.bulk_write(
+        requests=application_updates,
+        ordered=False,
+        session=mongo_session
+    )
     
     if not update_result.acknowledged:
         postgres_session.rollback()
@@ -299,6 +319,7 @@ def add_all_students(
 def create_applicant_flex_documents(
     applications_dict: dict[int, ApplicationWithMasterProps],
     mongo_db: MongoDatabase,
+    mongo_session: MongoSession,
     postgres_session: Session
 ):
     """
@@ -311,7 +332,11 @@ def create_applicant_flex_documents(
     flex_model_dicts = [application_to_flex(app).model_dump() for app in applications_dict.values()]
 
     accelerate_flex_collection = mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION)
-    insert_result = accelerate_flex_collection.insert_many(flex_model_dicts, ordered=False)
+    insert_result = accelerate_flex_collection.insert_many(
+        documents=flex_model_dicts,
+        ordered=False,
+        session=mongo_session
+    )
     if not insert_result.acknowledged:
         postgres_session.rollback()
         raise HTTPException(
