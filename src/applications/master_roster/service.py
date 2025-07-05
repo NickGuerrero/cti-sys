@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Tuple
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -31,14 +32,14 @@ def create_master_roster_records(
     """
     mongo_session.start_transaction()
 
-    user_submissions_dict = get_all_quiz_submissions()
+    submission_user_ids = get_all_quiz_submissions()
 
     application_collection = mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
     applications_dict, invalid_applications_count = get_valid_applications(
         application_collection=application_collection,
         mongo_session=mongo_session,
-        user_submissions_dict=user_submissions_dict
+        submission_user_ids=submission_user_ids
     )
 
     update_applicant_docs_commitment_status(
@@ -78,27 +79,28 @@ def create_master_roster_records(
         message=f"Successfully added {updated_docs_count} users to Master Roster",
     )
 
-def get_all_quiz_submissions() -> dict[int, QuizSubmission]:
+def get_all_quiz_submissions() -> set[int]:
     """
-    Function fetches Commitment Quiz QuizSubmissions from Canvas.
+    Function fetches user IDs from all Commitment Quiz QuizSubmissions on Canvas.
 
     Uses multiple external requests through pagination to fetch all submissions.
     """
-    # TODO pagination
-    url = f"{settings.canvas_api_url}/api/v1/courses/{settings.course_id_101}/quizzes/{settings.commitment_quiz_id}/submissions"
+    url = f"{settings.canvas_api_url}/api/v1/courses/{settings.course_id_101}/quizzes/{settings.commitment_quiz_id}/submissions?per_page=100"
     headers = {
         "Authorization": f"Bearer {get_canvas_access_token()}",
     }
-
-    response = get(url=url, headers=headers)
-    response.raise_for_status()
+    submission_user_ids = set()
 
     try:
-        quiz_submissions_json = response.json()["quiz_submissions"]
-        quiz_submissions: List[QuizSubmission] = [ # TODO pagination steps
-            QuizSubmission(**submission) for submission in quiz_submissions_json
-        ]
-        user_submissions_dict = {submission.user_id: submission for submission in quiz_submissions}
+        while url:
+            response = get(url=url, headers=headers)
+            response.raise_for_status()
+
+            submissions = response.json()["quiz_submissions"]
+            for submission in submissions:
+                submission_user_ids.add(QuizSubmission(**submission).user_id)
+
+            url = response.links.get("next", {}).get("url")
 
     except ValidationError as e:
         raise HTTPException(
@@ -106,18 +108,18 @@ def get_all_quiz_submissions() -> dict[int, QuizSubmission]:
             detail=f"Invalid quiz submission data found: {e.errors()}"
         )
     
-    if len(quiz_submissions) == 0:
+    if not submission_user_ids:
         return MasterRosterCreateResponse(
             status=200,
             message="No commitment quiz submissions to process"
         )
     
-    return user_submissions_dict
+    return submission_user_ids
 
 def get_valid_applications(
     application_collection: Collection,
     mongo_session: MongoSession,
-    user_submissions_dict: dict[int, QuizSubmission]
+    submission_user_ids: set[int]
 ) -> Tuple[dict[int, ApplicationWithMasterProps], int]:
     """
     Function fetches Application collection documents from MongoDB.
@@ -129,7 +131,7 @@ def get_valid_applications(
     """
     application_documents = application_collection.find({
         "$and": [
-            {"canvas_id": {"$in": list(user_submissions_dict.keys())}},
+            {"canvas_id": {"$in": list(submission_user_ids)}},
             {"master_added": False}
         ]
     }, session=mongo_session)
@@ -244,6 +246,17 @@ def application_to_student(application: ApplicationWithMasterProps) -> Student:
         ),
     )
     return student
+
+def get_target_year(date_applied: datetime) -> int:
+    """
+    Function returns the target summer's year for the applying student. Based on month
+    application was recieved.
+
+    Inclusively, applications from June (current year) through April (next year) have a target
+    of next year. All other applicants should be targeted for the current year if admitted.
+    """
+    if date_applied.month >= 6: return date_applied.year + 1
+    return date_applied
 
 def application_to_flex(application: ApplicationWithMasterProps) -> AccelerateFlexBase:
     accelerate_flex = AccelerateFlexBase(
