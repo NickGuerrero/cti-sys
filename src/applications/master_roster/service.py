@@ -76,7 +76,7 @@ def create_master_roster_records(
     mongo_session.commit_transaction()
     return MasterRosterCreateResponse(
         status=201,
-        message=f"Successfully added {updated_docs_count} users to Master Roster",
+        message=f"Successfully added {updated_docs_count} users to Master Roster [testing: found {len(submission_user_ids)} submissions]",
     )
 
 def get_all_quiz_submissions() -> set[int]:
@@ -100,7 +100,7 @@ def get_all_quiz_submissions() -> set[int]:
             for submission in submissions:
                 submission_user_ids.add(QuizSubmission(**submission).user_id)
 
-            url = response.links.get("next", {}).get("url")
+            url = response.links.get("next", {}).get("url", None)
 
     except ValidationError as e:
         raise HTTPException(
@@ -160,6 +160,12 @@ def update_applicant_docs_commitment_status(
     MongoDB updates write based on bulk_write with `ordered=False`, meaning writes will continue
     despite encountered failures with reporting back (each update is independent).
     """
+    if not applications_dict:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No applications match commitment user ids"
+        )
+
     application_updates: List[UpdateOne] = []
     for user_canvas_id, _ in applications_dict.items():
         application_updates.append(
@@ -220,7 +226,7 @@ def application_to_student(application: ApplicationWithMasterProps) -> Student:
         fname=application.fname,
         pname=application.pname,
         lname=application.lname,
-        target_year=application.app_submitted.year, # FIXME change to base on month and year
+        target_year=get_target_year(application.app_submitted),
         gender=application.gender,
         first_gen=application.first_gen,
         institution=application.institution,
@@ -288,6 +294,13 @@ def update_applicant_docs_master_added(
     MongoDB updates write based on bulk_write with `ordered=False`, meaning writes will continue
     despite encountered failures with reporting back (each update is independent).
     """
+    if not applications_dict:
+        postgres_session.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail=f"No applications match commitment user ids"
+        )
+
     application_updates: List[UpdateOne] = []
     for user_canvas_id, _ in applications_dict.items():
         application_updates.append(
@@ -318,6 +331,13 @@ def add_all_students(
     applications_dict: dict[int, ApplicationWithMasterProps],
     postgres_session: Session
 ):
+    """
+    Function creates Student and relational entities from each application and inserts
+    them into the PostgreSQL database. 
+
+    If application data could not be validated as a Student or there is an insertion error,
+    DB exception is thrown.
+    """
     try:
         students = [application_to_student(app) for app in applications_dict.values()]
         postgres_session.add_all(students)
