@@ -1,19 +1,38 @@
 from fastapi import HTTPException
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Engine
 from sqlalchemy.dialects.postgresql import array_agg
 from src.database.postgres.models import Student, Accelerate, StudentEmail, CanvasID, AccountabilityGroup, Ethnicity
+from src.database.postgres.core import engine as CONN
 # import mongo objects here
+import gspread
+import pandas
+from os import environ
 
-def connect_gspread():
-    pass
+def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str):
+    # Important: Enable both Google Drive and Google Sheet API for the key
+    gc = gspread.service_account(filename='gspread_credentials.json')
+    sh = gc.open_by_key(environ.get("ROSTER_SHEET_KEY"))
+    worksheet = sh.worksheet(worksheet_name)
+    worksheet.update([data.columns.values.tolist()] + data.values.tolist())
+    return {
+        "success": True,
+        "worksheet_updated": worksheet_name,
+        "rows_updated": len(data)
+    }
+
 def sync_roster():
     pass
-def fetch_roster(db: Session):
+def fetch_roster(eng: Engine):
     """
-    Fetch roster data from associated Accelerate tables, and return ???
+    Fetch roster from associated Accelerate tables, and return it as a pd dataframe
+    @param eng: A SQLAlchemy Engine object that connects to the database
+
+    Notes:
+    - pandas runs the query, so an Engine object is needed. Allowable for a Select query
+    - The dataframe headers will match the sheet headers
     """
-    roster_info = (
+    roster_query = (
         select(
             Student.cti_id.label("CTI ID"),
             StudentEmail.email.label("Primary Email Address"),
@@ -42,7 +61,13 @@ def fetch_roster(db: Session):
         .order_by(Student.cti_id.asc())
         .limit(998) # No more than 999 rows on 1 sheet without issues
     )
-    return roster_info
+    roster_frame = pandas.read_sql(roster_query, eng)
+
+    # Dataframe needs to be modified to be copied to Google Sheet. Mostly allowing serialization.
+    roster_frame = roster_frame.astype({"Birthday": str}) # Date objects not allowed
+    roster_frame['Ethnicities'] = roster_frame['Ethnicities'].apply(lambda x: ', '.join(x)) # Lists not allowed
+    roster_frame = roster_frame.fillna('') # Empty cells (na) not allowed, replaced with empty strings
+    return roster_frame
 
     pass
 def fetch_attendance():
