@@ -4,43 +4,34 @@ from sqlalchemy.orm import Session
 from src.database.postgres.models import Student, Attendance, StudentAttendance, Accelerate
 
 def process_student_activity(request, program: str, db: Session):
+    # Fetch students by target
+    if request.target == "active":
+        students = db.query(Student).filter(Student.active.is_(True)).all()
+    elif request.target == "inactive":
+        students = db.query(Student).filter(Student.active.is_(False)).all()
+    elif request.target == "both":
+        students = db.query(Student).all()
+    else:
+        raise ValueError("Invalid target")
+    
+    # Program-specific activity check (Accelerate)
     if program == "accelerate":
-        if request.target == "active":
-            students = db.query(Student).filter(Student.active.is_(True)).all()
-        elif request.target == "inactive":
-            students = db.query(Student).filter(Student.active.is_(False)).all()
-        elif request.target == "both":
-            students = db.query(Student).all()
-        else:
-            raise ValueError("Invalid target")
-
-        for idx, student in enumerate(students, start=1):
-            is_active = _check_attendance_threshold(
-                student.cti_id, request.active_start, request.activity_thresholds, db
-            )
-            student.active = is_active
-
+        for student in students:
             acc_record = db.query(Accelerate).filter(Accelerate.cti_id == student.cti_id).first()
             if acc_record:
-                acc_record.active = is_active
-
-    else:
-        # Overall or other program
-        if request.target == "active":
-            students = db.query(Student).filter(Student.active.is_(True)).all()
-        elif request.target == "inactive":
-            students = db.query(Student).filter(Student.active.is_(False)).all()
-        elif request.target == "both":
-            students = db.query(Student).all()
-        else:
-            raise ValueError("Invalid target")
-
+                acc_record.active = _check_attendance_threshold(
+                    student.cti_id, request.active_start, request.activity_thresholds, db
+                )
+        # Set overall student.active based only on accelerate.active
         for student in students:
-            is_active = _check_attendance_threshold(
-                student.cti_id, request.active_start, request.activity_thresholds, db
-            )
-            student.active = is_active
-
+            acc_record = db.query(Accelerate).filter(Accelerate.cti_id == student.cti_id).first()
+            if acc_record:
+                student.active = acc_record.active
+    
+    # Default else for future programs
+    else:
+        # For now does nothing, placeholder for future programs
+        pass
     db.commit()
 
 def _check_attendance_threshold(

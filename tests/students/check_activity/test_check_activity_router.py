@@ -62,26 +62,29 @@ class TestCheckActivity:
         assert mock_accelerate_record.active is False
 
     def test_check_activity_both(self, mock_postgresql_db):
-        """Test checking activity for both active and inactive students."""
         mock_db = mock_postgresql_db
 
         mock_student_active = Student(cti_id=1, fname="John", lname="Doe", active=True)
         mock_student_inactive = Student(cti_id=2, fname="Jane", lname="Doe", active=False)
-        mock_accelerate_active = Accelerate(cti_id=1, active=True)
-        mock_accelerate_inactive = Accelerate(cti_id=2, active=False)
+        mock_accelerate_active = Accelerate(cti_id=1, active=False)
+        mock_accelerate_inactive = Accelerate(cti_id=2, active=True)
 
         # For 'both', the code calls: db.query(Student).all()
         mock_db.query.return_value.all.return_value = [
             mock_student_active, mock_student_inactive
         ]
 
+        # Return the correct Accelerate record for each student, in order
         mock_db.query.return_value.filter.return_value.first.side_effect = [
-            mock_accelerate_active,
-            mock_accelerate_inactive
+        mock_accelerate_active,    # John, first loop
+        mock_accelerate_inactive,  # Jane, first loop
+        mock_accelerate_active,    # John, second loop
+        mock_accelerate_inactive   # Jane, second loop
         ]
+
         mock_db.query.return_value.join.return_value.filter.return_value.count.side_effect = [
-            1,  # first student => active
-            1   # second student => active
+            1,  # John attended, so accelerate.active should become True
+            0   # Jane did not attend, so accelerate.active should become False
         ]
 
         request_data = {
@@ -97,10 +100,10 @@ class TestCheckActivity:
         assert response.json() == {"status": 200}
         mock_db.commit.assert_called_once()
 
-        assert mock_student_active.active is True
-        assert mock_student_inactive.active is True
         assert mock_accelerate_active.active is True
-        assert mock_accelerate_inactive.active is True
+        assert mock_student_active.active is True
+        assert mock_accelerate_inactive.active is False
+        assert mock_student_inactive.active is False
 
     def test_database_error_handling(self, mock_postgresql_db):
         """Test handling of SQLAlchemy database errors."""
