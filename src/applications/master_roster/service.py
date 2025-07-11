@@ -6,6 +6,7 @@ from pymongo import UpdateOne
 from pymongo.collection import Collection
 from pymongo.client_session import ClientSession as MongoSession
 from pymongo.database import Database as MongoDatabase
+from pymongo.results import BulkWriteResult
 from requests import get
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -34,6 +35,12 @@ def create_master_roster_records(
 
     submission_user_ids = get_all_quiz_submissions()
 
+    if not submission_user_ids:
+        return MasterRosterCreateResponse(
+            status=200,
+            message="No commitment quiz submissions to process"
+        )
+
     application_collection = mongo_db.get_collection(APPLICATIONS_COLLECTION)
 
     applications_dict, invalid_applications_count = get_valid_applications(
@@ -41,6 +48,15 @@ def create_master_roster_records(
         mongo_session=mongo_session,
         submission_user_ids=submission_user_ids
     )
+
+    if not applications_dict:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No valid applications found matching quiz submissions. "
+                f"Found {invalid_applications_count} matching but invalid applications."
+            )
+        )
 
     update_applicant_docs_commitment_status(
         application_collection=application_collection,
@@ -107,13 +123,7 @@ def get_all_quiz_submissions() -> set[int]:
             status_code=422,
             detail=f"Invalid quiz submission data found: {e.errors()}"
         )
-    
-    if not submission_user_ids:
-        return MasterRosterCreateResponse(
-            status=200,
-            message="No commitment quiz submissions to process"
-        )
-    
+
     return submission_user_ids
 
 def get_valid_applications(
@@ -150,8 +160,8 @@ def get_valid_applications(
 
 def update_applicant_docs_commitment_status(
     application_collection: Collection,
-    mongo_session: MongoSession,
-    applications_dict: dict[int, ApplicationWithMasterProps]
+    applications_dict: dict[int, ApplicationWithMasterProps],
+    mongo_session: MongoSession = None,
 ) -> None:
     """
     Function updates the Application collection documents acknowledging their
@@ -162,8 +172,8 @@ def update_applicant_docs_commitment_status(
     """
     if not applications_dict:
         raise HTTPException(
-            status_code=422,
-            detail=f"No applications match commitment user ids"
+            status_code=400,
+            detail=f"Must contain at least one application"
         )
 
     application_updates: List[UpdateOne] = []
@@ -176,10 +186,11 @@ def update_applicant_docs_commitment_status(
                 }}
             )
         )
-    update_result = application_collection.bulk_write(
+
+    update_result = safe_bulk_write(
+        collection=application_collection,
         requests=application_updates,
         session=mongo_session,
-        ordered=False
     )
 
     if not update_result.acknowledged:
@@ -187,6 +198,19 @@ def update_applicant_docs_commitment_status(
             status_code=500,
             detail=f"Database failed to acknowledge bulk applications commitment update"
         )
+    
+def safe_bulk_write(
+    collection: Collection, requests: List[UpdateOne], session=None
+) -> BulkWriteResult:
+    """
+    Function allows bulk write to optionally include session argument.
+
+    Using as work around for MongoMock's lack of session support in testing.
+    """
+    if session:
+        return collection.bulk_write(requests=requests, session=session, ordered=False)
+    return collection.bulk_write(requests=requests, ordered=False)
+
 
 def remove_duplicate_applicants(
     applications_dict: dict[int, ApplicationWithMasterProps],
@@ -214,8 +238,8 @@ def remove_duplicate_applicants(
 
     if len(applications_dict) == 0 and duplicate_ids_count > 0:
         raise HTTPException(
-            status_code=422,
-            detail=f"No new commitments, {duplicate_ids_count} duplicate requests"
+            status_code=409,
+            detail=f"No new commitments: {duplicate_ids_count} applicants are already committed."
         )
 
     return duplicate_ids_count
@@ -262,7 +286,7 @@ def get_target_year(date_applied: datetime) -> int:
     of next year. All other applicants should be targeted for the current year if admitted.
     """
     if date_applied.month >= 6: return date_applied.year + 1
-    return date_applied
+    return date_applied.year
 
 def application_to_flex(application: ApplicationWithMasterProps) -> AccelerateFlexBase:
     accelerate_flex = AccelerateFlexBase(
@@ -312,9 +336,9 @@ def update_applicant_docs_master_added(
             )
         )
 
-    update_result = application_collection.bulk_write(
+    update_result = safe_bulk_write(
         requests=application_updates,
-        ordered=False,
+        collection=application_collection,
         session=mongo_session
     )
     
