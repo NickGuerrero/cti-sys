@@ -24,7 +24,7 @@ class ApplicationWithMasterProps(ApplicationModel):
     financial_need: Optional[List[str]] = Field(default=None)
     first_gen: Optional[bool] = Field(default=None)
     gender: Optional[str] = Field(default=None)
-    race_ethnicity: Optional[List[str]] = Field(default=None) # TODO needs to be interpretted
+    race_ethnicity: Optional[List[str]] = Field(default=None)
     heard_about: Optional[str] = Field(default=None)
 
     model_config = ConfigDict(extra="allow")

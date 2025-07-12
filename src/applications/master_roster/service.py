@@ -36,9 +36,9 @@ def create_master_roster_records(
     submission_user_ids = get_all_quiz_submissions()
 
     if not submission_user_ids:
-        return MasterRosterCreateResponse(
-            status=200,
-            message="No commitment quiz submissions to process"
+        raise HTTPException(
+            status_code=400,
+            detail="No commitment quiz submissions to process"
         )
 
     application_collection = mongo_db.get_collection(APPLICATIONS_COLLECTION)
@@ -69,12 +69,12 @@ def create_master_roster_records(
         postgres_session=postgres_session
     )
 
-    add_all_students(
+    invalid_students_count = add_all_students(
         applications_dict=applications_dict,
         postgres_session=postgres_session
     )
 
-    create_applicant_flex_documents(
+    invalid_flex_count = create_applicant_flex_documents(
         applications_dict=applications_dict,
         mongo_db=mongo_db,
         mongo_session=mongo_session,
@@ -92,7 +92,7 @@ def create_master_roster_records(
     mongo_session.commit_transaction()
     return MasterRosterCreateResponse(
         status=201,
-        message=f"Successfully added {updated_docs_count} users to Master Roster [testing: found {len(submission_user_ids)} submissions]",
+        message=f"Successfully added {updated_docs_count} users to Master Roster",
     )
 
 def get_all_quiz_submissions() -> set[int]:
@@ -232,7 +232,7 @@ def remove_duplicate_applicants(
     duplicate_ids_count = 0
     # each ID represents a duplicate that shouldn't be processed
     for student_id in student_id_rows:
-        id = student_id.tuple()[0]
+        id = student_id[0]
         applications_dict.pop(id)
         duplicate_ids_count += 1
 
@@ -310,7 +310,7 @@ def update_applicant_docs_master_added(
         application_collection: Collection,
         mongo_session: MongoSession,
         postgres_session: Session
-):
+) -> int:
     """
     Function updates the Application collection documents acknowledging their
     addition to the Master Roster.
@@ -321,8 +321,8 @@ def update_applicant_docs_master_added(
     if not applications_dict:
         postgres_session.rollback()
         raise HTTPException(
-            status_code=422,
-            detail=f"No applications match commitment user ids"
+            status_code=400,
+            detail=f"Must include at least one application"
         )
 
     application_updates: List[UpdateOne] = []
@@ -354,16 +354,27 @@ def update_applicant_docs_master_added(
 def add_all_students(
     applications_dict: dict[int, ApplicationWithMasterProps],
     postgres_session: Session
-):
+) -> int:
     """
     Function creates Student and relational entities from each application and inserts
-    them into the PostgreSQL database. 
+    them into the PostgreSQL database. Responds with count of invalid entity assignments count
+    which did not result in inserts.
 
     If application data could not be validated as a Student or there is an insertion error,
     DB exception is thrown.
     """
+
+    invalid_entity_attributes_count = 0
+    students: list[Student] = []
+
+    for app in applications_dict.values():
+        try:
+            student = application_to_student(app)
+            students.append(student)
+        except AttributeError as e:
+            # NOTE logger should acknowledge this skip
+            invalid_entity_attributes_count += 1
     try:
-        students = [application_to_student(app) for app in applications_dict.values()]
         postgres_session.add_all(students)
         postgres_session.flush()
     except SQLAlchemyError as e:
@@ -372,21 +383,30 @@ def add_all_students(
             status_code=500,
             detail=f"PostgreSQL Database error: {str(e)}"
         )
+    return invalid_entity_attributes_count
 
 def create_applicant_flex_documents(
     applications_dict: dict[int, ApplicationWithMasterProps],
     mongo_db: MongoDatabase,
     mongo_session: MongoSession,
     postgres_session: Session
-):
+) -> int:
     """
     Function takes list of ApplicationWithMasterProps objects and inserts data into
-    MongoDB Accelerate Flex collection.
+    MongoDB Accelerate Flex collection. Returns number of validation error skips.
 
     Insert will fail if ApplicationWithMasterProps attributes do not satisfy Accelerate Flex
     jsonSchema properties. Insert call uses `ordered=False` to skip insertion failures.
     """
-    flex_model_dicts = [application_to_flex(app).model_dump() for app in applications_dict.values()]
+    flex_model_dicts: list[AccelerateFlexBase] = []
+    invalid_count = 0
+    for app in applications_dict.values():
+        try:
+            flex = application_to_flex(app).model_dump()
+            flex_model_dicts.append(flex)
+        except AttributeError as e:
+            # NOTE logger should acknowledge this skip
+            invalid_count += 1
 
     accelerate_flex_collection = mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION)
     insert_result = accelerate_flex_collection.insert_many(
@@ -400,3 +420,5 @@ def create_applicant_flex_documents(
             status_code=500,
             detail=f"Database failed to acknowledge flex inserts"
         )
+    
+    return invalid_count

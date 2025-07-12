@@ -4,12 +4,24 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 from pymongo.database import Database as MongoDatabase
 from pymongo.client_session import ClientSession as MongoSession
+from pymongo.collection import Collection
+from pymongo.results import InsertManyResult
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.applications.master_roster.models import ApplicationWithMasterProps
-from src.applications.master_roster.service import add_all_students, create_applicant_flex_documents, get_all_quiz_submissions, get_target_year, get_valid_applications, remove_duplicate_applicants, update_applicant_docs_commitment_status, update_applicant_docs_master_added
+from src.applications.master_roster.service import (
+    add_all_students,
+    create_applicant_flex_documents,
+    get_all_quiz_submissions,
+    get_target_year,
+    get_valid_applications,
+    remove_duplicate_applicants,
+    update_applicant_docs_commitment_status,
+    update_applicant_docs_master_added,
+)
 from src.applications.models import ApplicationModel
-from src.config import APPLICATIONS_COLLECTION
+from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION
 
 class TestMasterRosterServices:
     @pytest.mark.canvas
@@ -217,8 +229,10 @@ class TestMasterRosterServices:
 
     def test_update_applicant_docs_commitment_status_successful_updates(self, mock_mongo_db: MongoDatabase):
         """
+        Test validates the updating of Application collection documents to reflect
+        a commitment_quiz_submitted change. Only Application document(s) provided in the
+        applications_dict parameter should be updated.
         """
-        pass
         test_applications_collection = mock_mongo_db.get_collection(APPLICATIONS_COLLECTION)
         applications = [
             ApplicationWithMasterProps(
@@ -295,12 +309,14 @@ class TestMasterRosterServices:
 
     def test_remove_duplicate_applicants_pops_duplicates(self, mock_postgresql_db):
         """
+        Test validates the successful running of duplicate data (conflicting primary key ids)
+        from the applications_dict through in-place mutation.
         """
-        mock_row_1 = MagicMock()
-        mock_row_1.__getitem__.return_value = 2
-        mock_row_1.cti_id = 2
+        mock_row = MagicMock()
+        duplicate_id = 2
+        mock_row.__getitem__.return_value = duplicate_id
 
-        mock_postgresql_db.exectute.return_value.fetch_all.return_value = [mock_row_1]
+        mock_postgresql_db.execute.return_value.fetchall.return_value = [mock_row]
 
         applications_dict = {
             1: ApplicationWithMasterProps(
@@ -315,7 +331,109 @@ class TestMasterRosterServices:
                 commitment_quiz_completed=False,
                 master_added=False,
             ),
-            2: ApplicationWithMasterProps( # marked as duplicate in mock query response
+            duplicate_id: ApplicationWithMasterProps( # marked as duplicate in mock query response
+                email="test2@cti.com",
+                lname="lname2",
+                fname="fname2",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=duplicate_id,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=False,
+                master_added=False,
+            ),
+            3: ApplicationWithMasterProps(
+                email="test3@cti.com",
+                lname="lname3",
+                fname="fname3",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=3,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=False,
+                master_added=False,
+            ),
+        }
+
+        duplicates_count = remove_duplicate_applicants(
+            applications_dict=applications_dict,
+            postgres_session=mock_postgresql_db
+        )
+
+        assert duplicates_count == 1
+        assert len(applications_dict) == 2
+        assert 2 not in applications_dict
+
+    def test_remove_duplicate_applicants_fail_all_duplicates(self, mock_postgresql_db):
+        """
+        Test validates the raising of an HTTPException on the input of all conflicting (duplicate)
+        data within applications_dict.
+        """
+        mock_row_1 = MagicMock()
+        mock_row_1.__getitem__.return_value = 1
+
+        mock_row_2 = MagicMock()
+        mock_row_2.__getitem__.return_value = 2
+
+        mock_postgresql_db.execute.return_value.fetchall.return_value = [mock_row_1, mock_row_2]
+
+        applications_dict = {
+            1: ApplicationWithMasterProps(
+                email="test1@cti.com",
+                lname="lname1",
+                fname="fname1",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=1,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=False,
+                master_added=False,
+            ),
+            2: ApplicationWithMasterProps(
+                email="test2@cti.com",
+                lname="lname2",
+                fname="fname2",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=2,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=False,
+                master_added=False,
+            )
+        }
+
+        with pytest.raises(HTTPException, match="No new commitments") as exc_info:
+            _ = remove_duplicate_applicants(
+                applications_dict=applications_dict,
+                postgres_session=mock_postgresql_db
+            )
+        assert exc_info.value.status_code == 409
+
+    def test_remove_duplicate_applicants_no_duplicates(self, mock_postgresql_db):
+        """
+        Test validates the accepting of applications_dict containing no duplicate ids
+        and no mutations on the dictionary occur.
+        """
+        mock_postgresql_db.execute.return_value.fetchall.return_value = []
+
+        applications_dict = {
+            1: ApplicationWithMasterProps(
+                email="test1@cti.com",
+                lname="lname1",
+                fname="fname1",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=1,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=False,
+                master_added=False,
+            ),
+            2: ApplicationWithMasterProps(
                 email="test2@cti.com",
                 lname="lname2",
                 fname="fname2",
@@ -346,36 +464,308 @@ class TestMasterRosterServices:
             postgres_session=mock_postgresql_db
         )
 
-        assert len(applications_dict) == 2
-        assert 2 not in applications_dict
-        assert duplicates_count == 1
+        assert duplicates_count == 0
+        assert len(applications_dict) == 3
+        assert all(id in applications_dict for id in {1, 2, 3})
 
-    def test_remove_duplicate_applicants_fail_all_duplicates(self, mock_postgresql_db):
-        """
-        """
-        remove_duplicate_applicants(applications_dict={}, postgres_session=mock_postgresql_db)
+    @pytest.mark.parametrize("date_and_expected", [
+        # january -> summer of current year
+        tuple([datetime(2025, 1, 20), 2025]),
 
-    def test_remove_duplicate_applicants_no_duplicates(self, mock_postgresql_db):
-        """
-        """
-        remove_duplicate_applicants(applications_dict={}, postgres_session=mock_postgresql_db)
+        # may -> summer of current year
+        tuple([datetime(2025, 5, 20), 2025]),
 
-    def test_get_target_year(self):
-        """
-        """
-        get_target_year(...)
+        # june -> summer of next year
+        tuple([datetime(2025, 6, 20), 2026]),
 
-    def test_update_applicant_docs_master_added_successful_updates(self):
-        """
-        """
-        update_applicant_docs_master_added(...)
+        # july -> summer of next year
+        tuple([datetime(2025, 7, 20), 2026]),
 
-    def test_add_all_students(self):
+        # december -> summer of next year
+        tuple([datetime(2025, 12, 20), 2026]),
+    ])
+    def test_get_target_year(self, date_and_expected):
         """
         """
-        add_all_students(...)
+        applied_datetime = date_and_expected[0]
+        expected_target_year = date_and_expected[1]
+        assert get_target_year(date_applied=applied_datetime) == expected_target_year
 
-    def create_applicant_flex_documents(self):
+    def test_update_applicant_docs_master_added_successful_updates(
+        self,
+        mock_postgresql_db,
+        mock_mongo_db: MongoDatabase
+    ):
         """
+        Test validates that applications included in the applications_dict argument successfully
+        have their master_added property set in Mongo. Applications not in this argument are not
+        altered.
         """
-        create_applicant_flex_documents(...)
+        applications_dict = {
+            1: ApplicationWithMasterProps(
+                email="test1@cti.com",
+                lname="lname1",
+                fname="fname1",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=1,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=False,
+            ),
+            2: ApplicationWithMasterProps(
+                email="test2@cti.com",
+                lname="lname2",
+                fname="fname2",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=2,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=False,
+            ),
+            3: ApplicationWithMasterProps(
+                email="test3@cti.com",
+                lname="lname3",
+                fname="fname3",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=3,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=False,
+            )
+        }
+
+        test_applications_collection = mock_mongo_db.get_collection(APPLICATIONS_COLLECTION)
+
+        insert_result = test_applications_collection.insert_many([
+            model.model_dump() for model in applications_dict.values()
+        ])
+        assert len(insert_result.inserted_ids) == len(applications_dict)
+
+        # insert app not included in applications_dict
+        insert_result = test_applications_collection.insert_one({
+            "email": "test4@cti.com",
+            "lname": "lname4",
+            "fname": "fname4",
+            "app_submitted": datetime.now(timezone.utc),
+            "canvas_id": 4,
+            "master_added": False,
+            "commitment_quiz_completed": False
+        })
+
+        modified_count = update_applicant_docs_master_added(
+            applications_dict=applications_dict,
+            application_collection=test_applications_collection,
+            mongo_session=None,
+            postgres_session=mock_postgresql_db
+        )
+
+        mock_postgresql_db.rollback.assert_not_called()
+        assert modified_count == 3
+
+        application_documents = test_applications_collection.find()
+        for app_doc in application_documents:
+            app = ApplicationWithMasterProps(**app_doc)
+            assert app.master_added or app.canvas_id == 4
+
+    def test_update_applicant_docs_master_added_missing_apps(self, mock_postgresql_db):
+        with pytest.raises(HTTPException, match="Must include at least one application") as exc_info:
+            _ = update_applicant_docs_master_added(
+                applications_dict={},
+                application_collection={},
+                mongo_session=None,
+                postgres_session=mock_postgresql_db
+            )
+        assert exc_info.value.status_code == 400
+        mock_postgresql_db.rollback.assert_called_once()
+
+    @patch("src.applications.master_roster.service.safe_bulk_write")
+    def test_update_applicant_docs_master_added_bad_db_response(
+        self,
+        mock_safe_bulk_write,
+        mock_postgresql_db,
+        mock_mongo_db: MongoDatabase
+    ):
+        """
+        Test validates that PostgreSQL rollsback progress on a bad response from the database.
+
+        Note: In the context of the request, the bulk_write to Mongo will NOT be committed as
+        there is an exception thrown in this case which closes the ClientSession therein ending
+        the transaction.
+        """
+
+        mock_result = MagicMock()
+        mock_result.acknowledged = False
+        mock_result.modified_count = 0
+        mock_safe_bulk_write.return_value = mock_result
+
+        applications_dict = {
+            1: MagicMock(),
+            2: MagicMock(),
+            3: MagicMock()
+        }
+
+        test_applications_collection = mock_mongo_db.get_collection(APPLICATIONS_COLLECTION)
+
+        with pytest.raises(HTTPException, match="Database failed to acknowledge") as exc_info:
+            _ = update_applicant_docs_master_added(
+                applications_dict=applications_dict,
+                application_collection=test_applications_collection,
+                mongo_session=None,
+                postgres_session=mock_postgresql_db
+            )
+        assert exc_info.value.status_code == 500
+        mock_postgresql_db.rollback.assert_called_once()
+
+    def test_add_all_students_success_filtering_valid_attributes(self, mock_postgresql_db):
+        """
+        Test validates the filtering of valid attribute-having dict values in applications_dict.
+        Invalid values should not prompt the function to fail but should increment an error
+        count as returned by the service function.
+        """
+        applications_dict = {
+            1: ApplicationWithMasterProps(
+                email="test1@cti.com",
+                lname="lname1",
+                fname="fname1",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=1,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=True,
+            ),
+            2: ApplicationWithMasterProps(
+                email="test2@cti.com",
+                lname="lname2",
+                fname="fname2",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=2,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=True,
+            ),
+            3: {
+                "invalid": True
+            }
+        }
+
+        invalid_count = add_all_students(
+            applications_dict=applications_dict,
+            postgres_session=mock_postgresql_db
+        )
+
+        mock_postgresql_db.rollback.assert_not_called()
+        assert invalid_count == 1
+
+    def test_add_all_students_raises_db_error(self, mock_postgresql_db):
+        """
+        Test validates the raising of an HTTPException following the catching of an
+        SQLAlchemy error from either `postgres_session.add_all(students)` or
+        `postgres_session.flush()`.
+        """
+        mock_postgresql_db.add_all.side_effect = SQLAlchemyError()
+
+        applications_dict = {}
+
+        with pytest.raises(HTTPException, match="PostgreSQL Database error") as exc_info:
+            _ = add_all_students(
+                applications_dict=applications_dict,
+                postgres_session=mock_postgresql_db
+            )
+        assert exc_info.value.status_code == 500
+        mock_postgresql_db.rollback.assert_called_once()
+
+    def test_create_applicant_flex_documents_success_with_skips(
+        self,
+        mock_mongo_db: MongoDatabase,
+        mock_postgresql_db
+    ):
+        """
+        Test validates the addition of AccelerateFlex documents to the Mongo database. Invalid
+        arguments are supplied in an application which should raise a handled exception and
+        be acknowledged as a failure to contruct model count.
+        """
+        applications_dict = {
+            1: ApplicationWithMasterProps(
+                email="test1@cti.com",
+                lname="lname1",
+                fname="fname1",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=1,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=True,
+            ),
+            2: ApplicationWithMasterProps(
+                email="test2@cti.com",
+                lname="lname2",
+                fname="fname2",
+                app_submitted=datetime.now(timezone.utc),
+                canvas_id=2,
+                added_unterview_course=False,
+                next_steps_sent=True,
+                accessed_unterview=True,
+                commitment_quiz_completed=True,
+                master_added=True,
+            ),
+            3: {
+                "invalid": True
+            }
+        }
+
+        invalid_count = create_applicant_flex_documents(
+            applications_dict=applications_dict,
+            mongo_db=mock_mongo_db,
+            mongo_session=None,
+            postgres_session=mock_postgresql_db
+        )
+
+        for id in [1, 2]:
+            flex_doc = mock_mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION).find_one({
+                "cti_id": id
+            })
+            assert flex_doc != None
+
+        assert mock_mongo_db.get_collection(ACCELERATE_FLEX_COLLECTION).find_one({
+                "cti_id": 3
+        }) == None
+
+        assert invalid_count == 1
+
+    def test_create_applicant_flex_documents_raises_db_error(self, mock_postgresql_db):
+        """
+        Test validates the raising of an HTTPException following the catching of a failure
+        of the Mongo database in acknowledging the AccelerateFlex insert(s). Validation
+        includes the rollback of the PostgreSQL database session.
+        """
+        mock_collection = MagicMock(spec=Collection)
+        mock_collection.insert_many.return_value = InsertManyResult(
+            inserted_ids=[],
+            acknowledged=False
+        )
+
+        mock_mongo = MagicMock(spec=MongoDatabase)
+        mock_mongo.get_collection.return_value = mock_collection
+
+        applications_dict = {}
+
+        with pytest.raises(HTTPException, match="Database failed to acknowledge flex inserts") as exc_info:
+            _ = create_applicant_flex_documents(
+                applications_dict=applications_dict,
+                mongo_db=mock_mongo,
+                mongo_session=None,
+                postgres_session=mock_postgresql_db
+            )
+        assert exc_info.value.status_code == 500
+        mock_postgresql_db.rollback.assert_called_once()
