@@ -95,7 +95,8 @@ class TestMasterRosterServices:
         third_page.links = {}
         third_page.raise_for_status = lambda: None
 
-        with patch("src.applications.master_roster.service.get", side_effect=[first_page, second_page, third_page]):
+        with patch("src.applications.master_roster.service.get", side_effect=[first_page, second_page, third_page]), \
+        patch("src.applications.master_roster.service.get_canvas_access_token", return_value="dummy-token"):
             submissions_user_ids = get_all_quiz_submissions()
 
         assert submissions_user_ids == {1, 2, 3, 4, 5}
@@ -134,7 +135,8 @@ class TestMasterRosterServices:
         first_page.links = {}
         first_page.raise_for_status = lambda: None
 
-        with patch("src.applications.master_roster.service.get", side_effect=[first_page]):
+        with patch("src.applications.master_roster.service.get", side_effect=[first_page]), \
+        patch("src.applications.master_roster.service.get_canvas_access_token", return_value="dummy-token"):
             with pytest.raises(HTTPException, match="Invalid quiz submission data found:") as exc_info:
                 _ = get_all_quiz_submissions()
             assert exc_info.value.status_code == 422
