@@ -13,7 +13,7 @@ from src.database.postgres.models import (
     Attendance, StudentEmail, MissingAttendance, StudentAttendance
 )
 from sqlalchemy.exc import SQLAlchemyError
-from src.utils.email import send_email
+from src.utils.email import send_email as raw_send_email
 
 def send_email_notification(
     to_email: str, 
@@ -25,7 +25,7 @@ def send_email_notification(
     This is used to send email notifications for attendance processing.
     """
     try:
-        send_email(to_email, subject, html_body)
+        raw_send_email(to_email, subject, html_body)
     except Exception:
         pass
 
