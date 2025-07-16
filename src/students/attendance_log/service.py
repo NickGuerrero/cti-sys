@@ -7,13 +7,32 @@ from urllib.parse import urlparse, parse_qs
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import io
-
+from fastapi import BackgroundTasks
+from src.config import settings
 from src.database.postgres.models import (
     Attendance, StudentEmail, MissingAttendance, StudentAttendance
 )
 from sqlalchemy.exc import SQLAlchemyError
+from src.utils.email import send_email
 
-def process_attendance(db: Session) -> Dict[str, int]:
+def send_email_notification(
+    to_email: str, 
+    subject: str, 
+    html_body: str
+) -> None:
+    """
+    Wrap the real send_email so background-task failures never bubble up.
+    This is used to send email notifications for attendance processing.
+    """
+    try:
+        send_email(to_email, subject, html_body)
+    except Exception:
+        pass
+
+def process_attendance(
+    db: Session,
+    background_tasks: BackgroundTasks,
+) -> Dict[str, int]:
     """
     Process unprocessed Attendance records with link_type='PearDeck':
     - Query all Attendance records where last_processed_date is None and link_type is 'PearDeck'.
@@ -23,38 +42,36 @@ def process_attendance(db: Session) -> Dict[str, int]:
         - On failure, rollback the transaction and increment sheets_failed.
     - Return a dictionary containing the counts of processed and failed sheets.
     """
-
-    # Query for unprocessed attendance records
     unprocessed = (
         db.query(Attendance)
-            .filter(Attendance.last_processed_date.is_(None))
-            .filter(func.lower(Attendance.link_type) == "peardeck")
-            .all()
+          .filter(Attendance.last_processed_date.is_(None))
+          .filter(func.lower(Attendance.link_type) == "peardeck")
+          .all()
     )
 
     sheets_processed = 0
     sheets_failed = 0
 
-    # Process each attendance record
-    # We use a try/except block to handle errors on a per-record basis
     for record in unprocessed:
         try:
-            process_attendance_record(record, db=db)
+            process_attendance_record(record, db=db, background_tasks=background_tasks)
             db.commit()
             sheets_processed += 1
         except (requests.RequestException, ValueError, SQLAlchemyError):
             db.rollback()
             sheets_failed += 1
 
-    # Return the result
-    # We don't raise an error here, we just return the counts
     return {
         "status": 200,
         "sheets_processed": sheets_processed,
         "sheets_failed": sheets_failed
     }
 
-def process_attendance_record(attendance_record: Attendance, db: Session) -> None:
+def process_attendance_record(
+    attendance_record: Attendance,
+    db: Session,
+    background_tasks: BackgroundTasks,
+) -> None:
     """
     Fetch the CSV data for this one Attendance record, parse each row, and
     update student_attendance or missing_attendance. If successful, mark last_processed_date.
@@ -62,50 +79,23 @@ def process_attendance_record(attendance_record: Attendance, db: Session) -> Non
     """
     df = fetch_csv_dataframe(attendance_record.link)
 
-    # Process each row in the DataFrame
-    # We use iterrows() to iterate over the DataFrame rows
     for _, row in df.iterrows():
         process_attendance_row(
             row_data=row,
             df_columns=df.columns,
             session_id=attendance_record.session_id,
-            db=db
+            db=db,
+            background_tasks=background_tasks,
         )
 
-    # Mark as processed
     attendance_record.last_processed_date = datetime.now()
-
-def fetch_csv_dataframe(link: str) -> pd.DataFrame:
-    """
-    Converts a Google Sheet link to a CSV export link, fetches CSV,
-    returns a pandas DataFrame. Checks for 'Name' and 'Email' columns.
-    Raises ValueError if missing columns or fetch fails.
-    """
-
-    # Fetch CSV from Google Sheets
-    csv_url = convert_google_sheet_link_to_csv(link)
-    resp = requests.get(csv_url)
-    resp.raise_for_status()
-
-    decoded_str = resp.content.decode("utf-8")
-
-    # Read CSV from string
-    df = pd.read_csv(io.StringIO(decoded_str))
-
-    # Clean up column names with extra spaces
-    df.columns = [col.strip() for col in df.columns]
-
-    # Check for required columns
-    if "Name" not in df.columns or "Email" not in df.columns:
-        raise ValueError("Required columns (Name, Email) not found in CSV.")
-
-    return df
 
 def process_attendance_row(
     row_data: pd.Series,
     df_columns: pd.Index,
     session_id: int,
-    db: Session
+    db: Session,
+    background_tasks: BackgroundTasks,
 ) -> None:
     """
     Processes a single row of attendance data:
@@ -156,6 +146,17 @@ def process_attendance_row(
             attended_minutes=attended_minutes
         )
         db.merge(missing)
+        background_tasks.add_task(
+            send_email_notification,
+            email,
+            "Attendance email not found - please update",
+            f"""
+            <p>Hi {name},</p>
+            <p>We couldn't find <strong>{email}</strong> in our records.</p>
+            <p>Please <a href="https://docs.google.com/forms/d/e/1FAIpQLSe6KnTqeAi_VwAZ2yKl6-Zuu2w0Jedi9dr0KDRd2c6YKrfTjA/viewform">
+               click here</a> to submit your correct email address.</p>
+            """
+        )
     else:
         # Otherwise, update or insert the student's attendance
         cti_id = email_record.cti_id
@@ -180,6 +181,32 @@ def process_attendance_row(
                 session_score=session_score
             )
             db.add(new_attendance)
+
+def fetch_csv_dataframe(link: str) -> pd.DataFrame:
+    """
+    Converts a Google Sheet link to a CSV export link, fetches CSV,
+    returns a pandas DataFrame. Checks for 'Name' and 'Email' columns.
+    Raises ValueError if missing columns or fetch fails.
+    """
+
+    # Fetch CSV from Google Sheets
+    csv_url = convert_google_sheet_link_to_csv(link)
+    resp = requests.get(csv_url)
+    resp.raise_for_status()
+
+    decoded_str = resp.content.decode("utf-8")
+
+    # Read CSV from string
+    df = pd.read_csv(io.StringIO(decoded_str))
+
+    # Clean up column names with extra spaces
+    df.columns = [col.strip() for col in df.columns]
+
+    # Check for required columns
+    if "Name" not in df.columns or "Email" not in df.columns:
+        raise ValueError("Required columns (Name, Email) not found in CSV.")
+
+    return df
 
 def convert_google_sheet_link_to_csv(link: str) -> str:
     """
@@ -218,3 +245,4 @@ def convert_google_sheet_link_to_csv(link: str) -> str:
     # Construct the CSV export URL
     # Default gid is 0 if not found
     return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid_value}"
+
