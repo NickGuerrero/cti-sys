@@ -9,7 +9,7 @@ from src.database.postgres.core import make_session
 from src.students.alternate_emails.schemas import AlternateEmailRequest
 from src.students.alternate_emails.service import modify, fetch_current_emails
 from src.config import settings
-from src.utils.email import send_email
+from src.utils.email import send_email as raw_send_email
 
 router = APIRouter()
 
@@ -23,7 +23,7 @@ def send_email_notification(
     This is used to send email notifications for alternate email changes.
     """
     try:
-        send_email(to_email, subject, html_body)
+        raw_send_email(to_email, subject, html_body)
     except Exception:
         pass
 
