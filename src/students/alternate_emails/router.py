@@ -80,6 +80,76 @@ def schedule_primary_notifications(
         f"<p>Your new primary email ({new_primary}) was confirmed.</p>"
     )
 
+def schedule_combined_notifications(
+    background_tasks: BackgroundTasks,
+    google_email: str,
+    removed_emails: List[str],
+    alt_emails: List[str],
+    old_primary: Optional[str],
+    new_primary: Optional[str],
+) -> None:
+    """
+    Schedule a single email summarizing all changes made to alternate emails.
+    This combines removals, additions, and primary email changes into one message.
+    """
+    parts: List[str] = []
+
+    if removed_emails:
+        removed = ", ".join(e.strip().lower() for e in removed_emails)
+        parts.append(f"You've removed these alternate email(s): <b>{removed}</b>")
+
+    if alt_emails:
+        added = ", ".join(e.strip().lower() for e in alt_emails)
+        parts.append(f"You've added these alternate email(s): <b>{added}</b>")
+
+    if new_primary:
+        # summary line for everyone
+        if old_primary and old_primary != new_primary:
+            parts.append(f"Your primary address was changed from <b>{old_primary}</b> to <b>{new_primary}</b>")
+        parts.append(f"Your new primary email <b>{new_primary}</b> has been confirmed")
+
+    if parts:
+        html_summary = f"""
+        <html>
+          <body style="font-family:Arial,sans-serif;line-height:1.5;">
+            <p>Hi there,</p>
+            <p>Here's a summary of your email updates:</p>
+            <ul>
+              {''.join(f'<li>{line}</li>' for line in parts)}
+            </ul>
+            <p>If you have any questions, contact support.</p>
+            <p>Best,<br/>The CTI Team</p>
+          </body>
+        </html>
+        """
+        # send one combined email to the user who submitted the form
+        background_tasks.add_task(
+            send_email_notification,
+            google_email,
+            "Email address updates",
+            html_summary
+        )
+
+    # send a dedicated message to the old primary email if it changed
+    if new_primary and old_primary and old_primary != new_primary:
+        html_old = f"""
+        <html>
+          <body style="font-family:Arial,sans-serif;line-height:1.5;">
+            <p>Hi there,</p>
+            <p>Your previous primary email <b>{old_primary}</b> was just changed to <b>{new_primary}</b>.</p>
+            <p>If that wasn't you, please contact support immediately.</p>
+            <p>Best,<br/>The CTI Team</p>
+          </body>
+        </html>
+        """
+        background_tasks.add_task(
+            send_email_notification,
+            old_primary,
+            "Your primary email was changed",
+            html_old
+        )
+
+
 @router.post("", status_code=status.HTTP_200_OK)
 def modify_alternate_emails(
     request: AlternateEmailRequest,
@@ -92,15 +162,24 @@ def modify_alternate_emails(
     try:
         google_email = request.google_form_email.strip().lower()
         new_primary = request.primary_email.strip().lower() if request.primary_email else None
-
         old_primary = google_email
+
+        # google_email = request.google_form_email.strip().lower()
+        # pre_update = fetch_current_emails(google_email, db=db)
+        # old_primary = pre_update["primary_email"]
+        # new_primary = request.primary_email.strip().lower() if request.primary_email else None
 
         modify(request=request, db=db)
 
-        # Send email notifications changes using background tasks and sendgrid
-        schedule_removal_notifications(background_tasks, google_email, request.remove_emails)
-        schedule_alternate_notifications(background_tasks, google_email, request.alt_emails)
-        schedule_primary_notifications(background_tasks, old_primary, new_primary)
+        # Only one merged email per request
+        schedule_combined_notifications(
+            background_tasks,
+            google_email,
+            request.remove_emails,
+            request.alt_emails,
+            old_primary,
+            new_primary,
+        )
 
         # Fetch updated data for the response
         updated = fetch_current_emails(google_email, db=db)
