@@ -160,14 +160,14 @@ def modify_alternate_emails(
     Modify a student's alternate and primary emails, then enqueue email notifications.
     """
     try:
-        google_email = request.google_form_email.strip().lower()
-        new_primary = request.primary_email.strip().lower() if request.primary_email else None
-        old_primary = google_email
-
         # google_email = request.google_form_email.strip().lower()
-        # pre_update = fetch_current_emails(google_email, db=db)
-        # old_primary = pre_update["primary_email"]
         # new_primary = request.primary_email.strip().lower() if request.primary_email else None
+        # old_primary = google_email
+
+        google_email = request.google_form_email.strip().lower()
+        pre_update = fetch_current_emails(google_email, db=db)
+        old_primary = pre_update["primary_email"]
+        new_primary = request.primary_email.strip().lower() if request.primary_email else None
 
         modify(request=request, db=db)
 
