@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
-
-# Consider moving into a pydantic-settings package's `class Settings(BaseSettings)` for environment-specific overrides
+from pydantic import Field
 
 class Settings(BaseSettings):
     app_env: str = "development"
@@ -10,9 +9,15 @@ class Settings(BaseSettings):
     current_unterview_section_id: int = 194
     canvas_api_url: str = "https://cti-courses.test.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
+    
+    # SA's Sheet URL for allowed emails and form submissions password
+    allowed_sas_sheet_url: str = Field(..., env="ALLOWED_SAS_SHEET_URL")
+    attendance_password: str = Field(..., env="ATTENDANCE_PASSWORD")
 
     model_config = {
-        "case_sensitive": False,
+        "case_sensitive": False, # Make environment variable names case-insensitive
+        "env_file": ".env", # Load environment variables from .env file
+        "extra": "ignore", # Ignore any extra fields not defined in the model
     }
 
 settings = Settings()
