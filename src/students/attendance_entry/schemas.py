@@ -4,9 +4,9 @@ class AttendanceEntryRequest(BaseModel):
     owner: EmailStr
     program: str
     session_type: str
-    session_date: str  # format: MM-DD-YYYY
-    session_start_time: str  # format: HH:MM AM/PM
-    session_end_time: str  # format: HH:MM AM/PM
+    session_date: str
+    session_start_time: str 
+    session_end_time: str
     link_type: str
     link: HttpUrl
     password: str
