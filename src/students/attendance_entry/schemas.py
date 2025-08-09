@@ -9,4 +9,4 @@ class AttendanceEntryRequest(BaseModel):
     session_end_time: str
     link_type: str
     link: HttpUrl
-    password: str
+    # password: str

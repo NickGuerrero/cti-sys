@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # SA's Sheet URL for allowed emails and form submissions password
     allowed_sas_sheet_url: Optional[str] = Field(None, env="ALLOWED_SAS_SHEET_URL")
     attendance_password: Optional[str] = Field(None, env="ATTENDANCE_PASSWORD")
+    attendance_api_key: Optional[str] = Field(None, env="ATTENDANCE_API_KEY")
 
     model_config = {
         "case_sensitive": False, # Make environment variable names case-insensitive
