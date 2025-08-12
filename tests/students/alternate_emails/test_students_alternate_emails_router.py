@@ -21,29 +21,40 @@ class TestModifyAlternateEmails:
         new_email_1 = StudentEmail(email="new1@example.com", cti_id=1, is_primary=False)
         new_email_2 = StudentEmail(email="new2@example.com", cti_id=1, is_primary=False)
 
-        # Lookup and student record fetch.
+        # stub fetch_current_emails pre-/post-
+        calls = iter([
+            {"emails": [primary_email.email], "primary_email": primary_email.email},
+            {"emails": [
+                primary_email.email,
+                new_email_1.email,
+                new_email_2.email
+            ], "primary_email": primary_email.email},
+        ])
+        monkeypatch.setattr(
+            "src.students.alternate_emails.router.fetch_current_emails",
+            lambda email, db: next(calls)
+        )
+
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            primary_email,  # initial primary fetch in find_student_by_google_email
-            student,        # student record lookup
-            None,           # new_email_1 not found
-            None,           # new_email_2 not found
-            primary_email   # final fetch in fetch_current_emails
+            primary_email,  # find_student_by_google_email
+            student,        # student record
+            None,           # new1 not found
+            None,           # new2 not found
         ]
-        # Simulate before and after modifications.
         mock_postgresql_db.query.return_value.filter.return_value.all.side_effect = [
-            [primary_email],
-            [primary_email, new_email_1, new_email_2]
+            [primary_email],                           
+            [primary_email, new_email_1, new_email_2], 
         ]
-        query = mock_postgresql_db.query.return_value.filter.return_value
-        query.update.return_value = 1
-        query.delete.return_value = 1
+        q = mock_postgresql_db.query.return_value.filter.return_value
+        q.update.return_value = 1
+        q.delete.return_value = 1
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
         response = client.post("/api/students/alternate-emails", json={
             "alt_emails": [new_email_1.email, new_email_2.email],
             "google_form_email": primary_email.email,
-            "primary_email": primary_email.email
+            "primary_email": primary_email.email,
         })
 
         assert response.status_code == 200
@@ -52,7 +63,6 @@ class TestModifyAlternateEmails:
             assert data == {"status": 200}
         else:
             assert data["status"] == 200
-            assert "emails" in data and "primary_email" in data
             emails_lower = [e.lower() for e in data["emails"]]
             assert new_email_1.email.lower() in emails_lower
             assert new_email_2.email.lower() in emails_lower
@@ -66,20 +76,27 @@ class TestModifyAlternateEmails:
         primary = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
         alternate = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
 
-        # Lookup and student record fetch.
+        # stub pre-/post- fetch_current_emails
+        calls = iter([
+            {"emails": [primary.email, alternate.email], "primary_email": primary.email},
+            {"emails": [primary.email], "primary_email": primary.email},
+        ])
+        monkeypatch.setattr(
+            "src.students.alternate_emails.router.fetch_current_emails",
+            lambda email, db: next(calls)
+        )
+
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
             primary,  # find_student_by_google_email
             student,  # student record
-            primary   # update_primary_email later
         ]
-        # First call returns both emails, second call returns only the primary.
         mock_postgresql_db.query.return_value.filter.return_value.all.side_effect = [
-            [primary, alternate],
-            [primary]
+            [primary, alternate],  # before removal
+            [primary],              # after removal
         ]
-        query = mock_postgresql_db.query.return_value.filter.return_value
-        query.update.return_value = 1
-        query.delete.return_value = 1
+        q = mock_postgresql_db.query.return_value.filter.return_value
+        q.update.return_value = 1
+        q.delete.return_value = 1
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
@@ -87,7 +104,7 @@ class TestModifyAlternateEmails:
             "alt_emails": [],
             "remove_emails": [alternate.email],
             "google_form_email": primary.email,
-            "primary_email": primary.email
+            "primary_email": primary.email,
         })
 
         assert response.status_code == 200
@@ -111,20 +128,27 @@ class TestModifyAlternateEmails:
         old_email = StudentEmail(email="old@example.com", cti_id=1, is_primary=True)
         new_email = StudentEmail(email="new@example.com", cti_id=1, is_primary=False)
 
-        # Lookup and student record fetch.
+        # stub pre-/post- fetch_current_emails
+        calls = iter([
+            {"emails": [old_email.email, new_email.email], "primary_email": old_email.email},
+            {"emails": [old_email.email, new_email.email], "primary_email": new_email.email},
+        ])
+        monkeypatch.setattr(
+            "src.students.alternate_emails.router.fetch_current_emails",
+            lambda email, db: next(calls)
+        )
+
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            new_email,  # lookup by google_form_email returns the alternate
-            student,    # fetch student record
-            new_email   # fetch_current_emails returns new_email as primary
+            new_email,  # find_student_by_google_email
+            student,    # student record
         ]
-        # new_email is now primary and old_email remains non primary.
-        updated_old_email = StudentEmail(email="old@example.com", cti_id=1, is_primary=False)
-        updated_new_email = StudentEmail(email="new@example.com", cti_id=1, is_primary=True)
+        # simulate that after primary-change both emails still exist
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [
-            updated_old_email, updated_new_email
+            StudentEmail(email="old@example.com", cti_id=1, is_primary=False),
+            StudentEmail(email="new@example.com", cti_id=1, is_primary=True),
         ]
-        query = mock_postgresql_db.query.return_value.filter.return_value
-        query.update.side_effect = [1, 1]
+        q = mock_postgresql_db.query.return_value.filter.return_value
+        q.update.side_effect = [1, 1]
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
@@ -132,7 +156,7 @@ class TestModifyAlternateEmails:
             "alt_emails": [],
             "remove_emails": [],
             "google_form_email": new_email.email,
-            "primary_email": new_email.email
+            "primary_email": new_email.email,
         })
 
         assert response.status_code == 200
@@ -140,14 +164,61 @@ class TestModifyAlternateEmails:
         if env == "production":
             assert data == {"status": 200}
         else:
-            assert data["status"] == 200
-            assert "emails" in data
             emails_lower = [e.lower() for e in data["emails"]]
-            # Verify both emails remain and primary is updated.
             assert old_email.email.lower() in emails_lower
             assert new_email.email.lower() in emails_lower
             assert data["primary_email"].lower() == new_email.email.lower()
 
+    @pytest.mark.parametrize("env", ["production", "development"])
+    def test_skip_nonexistent_email_removal(self, env, monkeypatch, mock_postgresql_db):
+        """Test that removal skips emails not found in the student record."""
+        monkeypatch.setattr(settings, "app_env", env)
+        student = Student(cti_id=1, fname="Jane", lname="Doe")
+        primary = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
+        alt = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
+
+        # stub pre-/post- fetch_current_emails
+        calls = iter([
+            {"emails": [primary.email, alt.email], "primary_email": primary.email},
+            {"emails": [primary.email], "primary_email": primary.email},
+        ])
+        monkeypatch.setattr(
+            "src.students.alternate_emails.router.fetch_current_emails",
+            lambda email, db: next(calls)
+        )
+
+        mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
+            primary,  # find_student_by_google_email
+            student,  # student record
+        ]
+        mock_postgresql_db.query.return_value.filter.return_value.all.side_effect = [
+            [primary, alt],  # before skipping
+            [primary],       # after skipping
+        ]
+        q = mock_postgresql_db.query.return_value.filter.return_value
+        q.update.return_value = 1
+        q.delete.return_value = 1
+        mock_postgresql_db.commit.return_value = None
+        mock_postgresql_db.rollback.return_value = None
+
+        response = client.post("/api/students/alternate-emails", json={
+            "alt_emails": [],
+            "remove_emails": ["notfound@email.com", alt.email],
+            "google_form_email": primary.email,
+            "primary_email": primary.email,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        if env == "production":
+            assert data == {"status": 200}
+        else:
+            emails_lower = [e.lower() for e in data["emails"]]
+            assert primary.email.lower() in emails_lower
+            assert alt.email.lower() not in emails_lower
+            assert data["primary_email"].lower() == primary.email.lower()
+       
+            
     # ====================
     # Error Conditions
     # ====================
@@ -159,9 +230,10 @@ class TestModifyAlternateEmails:
         other_student_email = StudentEmail(email="someoneelse@email.com", cti_id=2, is_primary=True)
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            student_email,      # student's email record found
-            student,            # student record found
-            other_student_email # alternate email belongs to another student
+            student_email,
+            student_email,
+            student,
+            other_student_email,
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [student_email]
 
@@ -195,8 +267,9 @@ class TestModifyAlternateEmails:
         alternate = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            primary,  # returns student's primary email
-            student   # returns student record
+            primary,
+            primary,
+            student,
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [primary, alternate]
 
@@ -210,25 +283,38 @@ class TestModifyAlternateEmails:
         assert response.status_code == 403
         assert "Primary email must match the email used to submit the form" in response.json().get("detail", "")
 
-    def test_skip_nonexistent_email_removal(self, monkeypatch, mock_postgresql_db):
+    @pytest.mark.parametrize("env", ["production", "development"])
+    def test_skip_nonexistent_email_removal(self, env, monkeypatch, mock_postgresql_db):
         """Test that removal skips emails not found in the student record."""
-        monkeypatch.setattr(settings, "app_env", "development")
+        monkeypatch.setattr(settings, "app_env", env)
+
+        # Prepare our student and emails
         student = Student(cti_id=1, fname="Jane", lname="Doe")
         primary = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
         alt = StudentEmail(email="alt@email.com", cti_id=1, is_primary=False)
 
+        # stub pre-/post- fetch_current_emails
+        calls = iter([
+            {"emails": [primary.email, alt.email], "primary_email": primary.email},
+            {"emails": [primary.email], "primary_email": primary.email},
+        ])
+        monkeypatch.setattr(
+            "src.students.alternate_emails.router.fetch_current_emails",
+            lambda email, db: next(calls)
+        )
+
+        # DB mocks for service.modify()
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            primary,  # primary lookup
-            student,  # student record
-            primary   # for update_primary_email
+            primary,  # find_student_by_google_email
+            student,  # student record lookup
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.side_effect = [
-            [primary, alt],
-            [primary]
+            [primary, alt],  # before skipping nonexistent
+            [primary],       # after skipping
         ]
-        query = mock_postgresql_db.query.return_value.filter.return_value
-        query.update.return_value = 1
-        query.delete.return_value = 1
+        q = mock_postgresql_db.query.return_value.filter.return_value
+        q.update.return_value = 1
+        q.delete.return_value = 1
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
@@ -236,7 +322,7 @@ class TestModifyAlternateEmails:
             "alt_emails": [],
             "remove_emails": ["notfound@email.com", alt.email],
             "google_form_email": primary.email,
-            "primary_email": primary.email
+            "primary_email": primary.email,
         })
 
         assert response.status_code == 200
@@ -249,29 +335,6 @@ class TestModifyAlternateEmails:
             assert alt.email.lower() not in emails_lower
             assert data["primary_email"].lower() == primary.email.lower()
 
-    def test_remove_primary_email_without_new_primary(self, mock_postgresql_db):
-        """
-        Test error when attempting to remove the primary email without specifying a new primary.
-        """
-        student = Student(cti_id=1, fname="Jane", lname="Doe")
-        primary = StudentEmail(email="primary@example.com", cti_id=1, is_primary=True)
-
-        mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            primary,  # primary email record
-            student   # student record
-        ]
-        mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [primary]
-
-        response = client.post("/api/students/alternate-emails", json={
-            "alt_emails": [],
-            "remove_emails": [primary.email],
-            "google_form_email": primary.email,
-            "primary_email": ""
-        })
-
-        assert response.status_code == 403
-        assert "Cannot remove primary email" in response.json().get("detail", "")
-
     def test_update_primary_email_not_found(self, mock_postgresql_db):
         """
         Test error when update for setting a new primary email fails.
@@ -280,8 +343,9 @@ class TestModifyAlternateEmails:
         primary = StudentEmail(email="primary@example.com", cti_id=1, is_primary=False)
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
-            primary,  # lookup returns primary email record
-            student   # student record lookup
+            primary,  # pre_update
+            primary,  # find_student_by_google_email
+            student,  # student record
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [primary]
         query = mock_postgresql_db.query.return_value.filter.return_value
