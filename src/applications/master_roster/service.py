@@ -101,7 +101,7 @@ def get_all_quiz_submissions() -> set[int]:
 
     Uses multiple external requests through pagination to fetch all submissions.
     """
-    url = f"{settings.canvas_api_url}/api/v1/courses/{settings.course_id_101}/quizzes/{settings.commitment_quiz_id}/submissions?per_page=100"
+    url = f"{settings.canvas_api_url}/api/v1/courses/{settings.unterview_course_id}/quizzes/{settings.commitment_quiz_id}/submissions?per_page=100"
     headers = {
         "Authorization": f"Bearer {get_canvas_access_token()}",
     }
