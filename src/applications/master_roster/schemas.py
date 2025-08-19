@@ -26,17 +26,17 @@ class QuizSubmission(BaseModel):
     user_id: int
     submission_id: Optional[int]
     started_at: datetime
-    finished_at: datetime
+    finished_at: Optional[datetime]
     end_at: Optional[datetime]
     attempt: int
     extra_attempts: Optional[int]
     extra_time: Optional[int]
     manually_unlocked: Optional[bool]
-    time_spent: int
-    score: float
+    time_spent: Optional[int]
+    score: Optional[float]
     score_before_regrade: Optional[float]
-    kept_score: float
+    kept_score: Optional[float]
     fudge_points: Optional[float]
-    has_seen_results: bool
+    has_seen_results: Optional[bool]
     workflow_state: QuizSubmissionWorkflowState
     overdue_and_needs_submission: bool
