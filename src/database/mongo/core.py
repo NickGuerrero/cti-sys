@@ -19,7 +19,20 @@ def ping_mongo(client: MongoClient):
 	client.admin.command('ping')
 
 def get_mongo():
+    "**Deprecated** for direct operations to DB collections, use `make_mongo_session` instead."
     return client[MONGO_DATABASE_NAME]
+
+def make_mongo_session():
+    """
+    Dependency starts and yields a MongoDB ClientSession.
+
+    After closure of utilizing scope, session will finish and abort started transaction.
+    """
+    client_session = client.start_session()
+    try:
+        yield client_session
+    finally:
+        client_session.end_session()
 
 def init_mongo():
     init_collections(get_mongo())
