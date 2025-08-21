@@ -7,6 +7,7 @@ from src.students.alternate_emails.router import router as student_alternate_ema
 from src.students.attendance_log.router import router as student_attendance_log_router
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
 from src.students.missing_students.router import router as student_recover_attendance_router
+from src.gsheet.refresh.router import router as gsheet_refresh_router
 
 
 api_router = APIRouter()
@@ -57,5 +58,12 @@ api_router.include_router(
 api_router.include_router(
     student_recover_attendance_router,
     prefix="/students/recover-attendance",
+    tags=["Students"]
+)
+
+# /api/gsheet/refresh/...
+api_router.include_router(
+    gsheet_refresh_router,
+    prefix="/gsheet/refresh",
     tags=["Students"]
 )
