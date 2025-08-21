@@ -1,17 +1,51 @@
 from fastapi import HTTPException
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session, Engine
+from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine
 from sqlalchemy.dialects.postgresql import array_agg
 from src.database.postgres.models import Student, Accelerate, StudentEmail, CanvasID, AccountabilityGroup, Ethnicity
-from src.database.postgres.core import engine as CONN
 # import mongo objects here
 import gspread
 import pandas
 from os import environ
 
-def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str):
+def create_credentials():
+    """
+    Create GSheet credentials from an environment variable
+
+    Production use only, normally you could have the credentials file in your project
+    Deploying with Heroku requires the credentials be placed somewhere else. Make sure
+    the below env vars are set before use
+
+    """
+    credentials = {
+        "type": "service_account",
+        "project_id": environ.get("GS_PROJECT_ID"),
+        "private_key_id": environ.get("GS_PRIVATE_KEY_ID"),
+        "private_key": environ.get("GS_PRIVATE_KEY"),
+        "client_email": environ.get("GS_CLIENT_EMAIL"),
+        "client_id": environ.get("GS_CLIENT_ID"),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": environ.get("GS_509_CERT_URL"),
+        "universe_domain": "googleapis.com"
+    }
+    gc = gspread.service_account_from_dict(credentials)
+    return gc
+
+
+def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str,
+                    gc: gspread.client.Client, sh: str):
+    """
+    Write a pandas dataframe to a Google Sheet
+    
+    @param data: The pandas Dataframe. Headers are written as the first row
+    @param worksheet_name: The name of the worksheet in the Google Sheet
+    @param gc: The Gspread client, uses credentials set-up prior
+    @param sh: The Google Sheet ID (Retrieved from the URL)
+    """
     # Important: Enable both Google Drive and Google Sheet API for the key
-    gc = gspread.service_account(filename='gspread_credentials.json')
     sh = gc.open_by_key(environ.get("ROSTER_SHEET_KEY"))
     worksheet = sh.worksheet(worksheet_name)
     worksheet.update([data.columns.values.tolist()] + data.values.tolist())
@@ -21,8 +55,6 @@ def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str):
         "rows_updated": len(data)
     }
 
-def sync_roster():
-    pass
 def fetch_roster(eng: Engine):
     """
     Fetch roster from associated Accelerate tables, and return it as a pd dataframe
@@ -65,10 +97,8 @@ def fetch_roster(eng: Engine):
 
     # Dataframe needs to be modified to be copied to Google Sheet. Mostly allowing serialization.
     roster_frame = roster_frame.astype({"Birthday": str}) # Date objects not allowed
-    roster_frame['Ethnicities'] = roster_frame['Ethnicities'].apply(lambda x: ', '.join(x)) # Lists not allowed
+    roster_frame['Ethnicities'] = roster_frame['Ethnicities'].apply(
+            lambda x: ', '.join(x) if isinstance(x, list) else (x if pandas.notnull(x) else "")
+        ) # Lists not allowed
     roster_frame = roster_frame.fillna('') # Empty cells (na) not allowed, replaced with empty strings
     return roster_frame
-
-    pass
-def fetch_attendance():
-    pass
