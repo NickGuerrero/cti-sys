@@ -3,6 +3,7 @@ import pytest
 import pandas
 import gspread
 from datetime import datetime
+from os import environ
 
 from src.database.postgres.models import Student, StudentEmail, CanvasID, Ethnicity
 from src.main import app
@@ -15,46 +16,47 @@ client = TestClient(app)
 
 class TestGSheet:
     @pytest.mark.integration
-    def testRefreshMain(self):
-        response = client.post("/api/refresh/main", json={
-            "fname": "First",
-            "lname": "Last",
-            "email": "test.user@cti",
-            "cohort": True,
-            "graduating_year": 2024
-        })
-        # Verify rows are the same
-        # NOTE: This does not check for an absolute match, because data types are likely different
-        # Will need more development when determining how to synchronize GSheets and the database
+    @pytest.mark.gsheet
+    def testRefreshMain(self, monkeypatch):
+        """
+        Check that the gspread integration is working, not that it works correctly
+        Note that verifying that the sheets match requires type-alignment, which is
+        outside the scope of this issue. If Read-Write is solved, it should be implemented.
+        """
+        # Note that TEST_SHEET_KEY should only ever be called and used in testing
+        monkeypatch.setenv("ROSTER_SHEET_KEY", environ.get("TEST_SHEET_KEY"))
+        response = client.post("/api/gsheet/refresh/main")
+
+        # Check that at least the correct number of rows were written
+        gc = service.create_credentials()
+        output_spreadsheet = gc.open_by_key(environ.get("TEST_SHEET_KEY"))
+        output_worksheet = output_spreadsheet.worksheet("Main Roster")
+        output_df = pandas.DataFrame(output_worksheet.get_all_records())
+        roster_data = service.fetch_roster(CONN)
+
+        # Note that modifying the test sheet during the test will break the assertion
+        assert output_df.shape == roster_data.shape
         return
     
-    def testPandasMain(self):
+    @pytest.mark.integration
+    @pytest.mark.gsheet
+    def testPandasDataframeCreation(self):
         """
         Check that pandas dataframe meets certain sheet requirements
         Columns can be updated, only minimum should be tested
+
+        Note: Since pandas.read_sql() depends on using an actual database, this
+        has to be an integration test. Since we can't guarantee the contents
+        of the database between tests, we'll focus on verifying the dataframe
         """
         with SessionFactory() as cur_session:
-            # Session creation
-            student_a = Student(cti_id=1,fname="Jane",lname="Doe",target_year=2025,
-                gender="Female",first_gen=True,institution="SJSU",is_graduate=False,
-                birthday=datetime(2000, 11, 29),cohort_lc=False,
-                email_addresses=[
-                    StudentEmail(email="janedoe@email.com", is_primary=False),
-                    StudentEmail(email="janedoe@gmail.com", is_primary=True)],
-                canvas_id=CanvasID(canvas_id=100),
-                ethnicities=[Ethnicity(ethnicity="Hispanic or Latino"), Ethnicity(ethnicity="Asian")]
-            )
-            student_b = Student(cti_id=1,fname="John",lname="Doe",target_year=2025,
-                gender="Male",first_gen=True,institution="SJSU",is_graduate=False,
-                birthday=datetime(2000, 11, 29),cohort_lc=False,
-                email_addresses=[StudentEmail(email="johndoe@gmail.com", is_primary=True)],
-                canvas_id=CanvasID(canvas_id=100),
-                ethnicities=[Ethnicity(ethnicity="Hispanic or Latino")]
-            )
-            cur_session.add_all([student_a, student_b])
-            # Actual Test
-            roster_data = service.fetch_roster(cur_session.connection())
-            assert isinstance(roster_data, pandas.DataFrame)
-            assert not roster_data.duplicated().any()
-            assert {'id', 'email'}.issubset(roster_data.columns)
+            try:
+                # Note even without elements, the actual dataframe should be built correctly
+                roster_data = service.fetch_roster(cur_session.connection())
+                assert isinstance(roster_data, pandas.DataFrame)
+                assert not roster_data.duplicated().any()
+                assert {'CTI ID', 'Primary Email Address'}.issubset(roster_data.columns)
+            finally:
+                cur_session.rollback() # Rollbacks uncommitted changes
+                cur_session.close() # Close the session
             return

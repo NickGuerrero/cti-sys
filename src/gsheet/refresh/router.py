@@ -12,7 +12,7 @@ import src.gsheet.refresh.service as service
 
 router = APIRouter()
 
-@router.post("/gsheet/refresh/main",
+@router.post("/main",
     description="Refresh main roster information on the associated Google Sheet",
     response_description="Updated main roster",
     status_code=status.HTTP_201_CREATED)
