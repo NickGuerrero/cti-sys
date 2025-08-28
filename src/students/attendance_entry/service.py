@@ -14,7 +14,10 @@ from src.students.attendance_entry.schemas import AttendanceEntryRequest
 from urllib.parse import urlparse, parse_qs
 
 def detect_date_format(date_str: str) -> str:
-    """Detect which date format to use based on delimiters and component length."""
+    """
+    Detect which date format to use based on delimiters and component length.
+    Accepts:  MM/DD/YYYY, MM-DD-YYYY, or YYYY-MM-DD
+    """
     date_str = date_str.strip()
     if "/" in date_str:
         return "%m/%d/%Y"
@@ -28,7 +31,10 @@ def detect_date_format(date_str: str) -> str:
 
 
 def parse_datetime(date_part: str, time_part: str, date_fmt: str) -> datetime:
-    """Try multiple time formats and return a datetime or raise HTTP 400."""
+    """
+    Try multiple time formats and return a datetime or raise HTTP 400.
+    12-hour time with AM/PM, 24-hour time with seconds, 24-hour time without seconds.
+    """
     time_formats = ("%I:%M %p", "%H:%M:%S", "%H:%M")  # 12h, 24h
     last_err: Optional[Exception] = None
     for tf in time_formats:
@@ -46,7 +52,6 @@ def parse_session_datetimes(entry: AttendanceEntryRequest) -> Tuple[datetime, da
     """
     Accepts dates in:  MM/DD/YYYY, MM-DD-YYYY, or YYYY-MM-DD
     Accepts times in:  '6:00 PM', '08:00 PM', '18:00', '18:00:00'
-    Returns tz-naive datetimes suitable for a TIMESTAMP WITHOUT TIME ZONE column.
     """
     date_fmt = detect_date_format(entry.session_date)
     start_dt = parse_datetime(entry.session_date, entry.session_start_time, date_fmt)
@@ -93,6 +98,7 @@ def load_allowed_emails() -> Set[str]:
     """
     Fetch the allow-list from a public Google Sheet CSV.
     Expects a header row that includes an 'email' column.
+    Caches the result in memory for the process lifetime.
     """
     raw_url = (settings.allowed_sas_sheet_url or "").strip()
     if not raw_url:
@@ -139,8 +145,12 @@ def process_session_submission(db: Session, entry: AttendanceEntryRequest) -> Di
     """
     Insert a single attendance session record.
     Upstream router handles API-key auth.
-    This function validates the submitter (allow-list), parses date/times,
-    persists the row, and returns a summary payload.
+    This function validates the allow-list and input data.
+
+    Steps:
+    1. Check if entry.owner is in the allow-list.
+    2. Parse and validate session date/times.
+    3. Insert into the database.
     """
     if entry.owner.lower().strip() not in load_allowed_emails():
         raise HTTPException(
@@ -160,7 +170,7 @@ def process_session_submission(db: Session, entry: AttendanceEntryRequest) -> Di
         owner=entry.owner.strip(),
         last_processed_date=None,
     )
-    
+
     try:
         db.add(att)
         db.commit()
