@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     roster_sheet_key: Optional[str] = Field(validation_alias="ROSTER_SHEET_KEY", default=None)
     gs_509_cert_url: Optional[str] = Field(validation_alias="GS_509_CERT_URL", default=None)
     gs_client_id: Optional[str] = Field(validation_alias="GS_CLIENT_ID", default=None)
+    gs_client_email: Optional[str] = Field(validation_alias="GS_CLIENT_EMAIL", default=None)
     gs_private_key: Optional[str] = Field(validation_alias="GS_PRIVATE_KEY", default=None)
     gs_private_key_id: Optional[str] = Field(validation_alias="GS_PRIVATE_KEY_ID", default=None)
     gs_project_id: Optional[str] = Field(validation_alias="GS_PROJECT_ID", default=None)
@@ -45,6 +46,7 @@ class Settings(BaseSettings):
     # Application Constants
     canvas_api_url: str = "https://cti-courses.test.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
+    sa_whitelist: str = "SA Whitelist"
 
     # UNDER REVIEW
     # SA's Sheet URL for allowed emails and form submissions password
