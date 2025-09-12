@@ -96,7 +96,7 @@ def normalize_google_sheet_url(raw_url: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
 @lru_cache(maxsize=1)
-def load_email_whitelist(worksheet_name=settings.sa_whitelist) -> Set[str]:
+def load_email_whitelist(sheet_key=settings.roster_sheet_key, worksheet=settings.sa_whitelist) -> Set[str]:
     """
     Fetch the allow-list from the Main Roster
     Expect a header row that includes an 'email' column
@@ -104,8 +104,8 @@ def load_email_whitelist(worksheet_name=settings.sa_whitelist) -> Set[str]:
     """
     # Fetch the whitelist directly from the Main Roster
     gc = create_credentials()
-    sh = gc.open_by_key(settings.roster_sheet_key)
-    whitelist = sh.worksheet(worksheet_name)
+    sh = gc.open_by_key(sheet_key)
+    whitelist = sh.worksheet(worksheet)
     # Convert it into a set for the cache
     df = get_as_dataframe(whitelist, names=["email"])
     return set(df["email"])
@@ -170,7 +170,7 @@ def process_session_submission(db: Session, entry: AttendanceEntryRequest) -> Di
     2. Parse and validate session date/times.
     3. Insert into the database.
     """
-    if entry.owner.lower().strip() not in load_allowed_emails():
+    if entry.owner.lower().strip() not in load_email_whitelist(): # TODO
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email not authorized to submit attendance",

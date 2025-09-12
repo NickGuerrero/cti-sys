@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Google Cloud Authorization, only required for Google Sheet integrations
     roster_sheet_key: Optional[str] = Field(validation_alias="ROSTER_SHEET_KEY", default=None)
+    test_sheet_key: Optional[str] = Field(validation_alias="TEST_SHEET_KEY", default=None)
     gs_509_cert_url: Optional[str] = Field(validation_alias="GS_509_CERT_URL", default=None)
     gs_client_id: Optional[str] = Field(validation_alias="GS_CLIENT_ID", default=None)
     gs_client_email: Optional[str] = Field(validation_alias="GS_CLIENT_EMAIL", default=None)

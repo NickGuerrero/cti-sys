@@ -1,10 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
+from gspread_dataframe import get_as_dataframe, set_with_dataframe
+import pandas as pd
 
 from src.main import app
+from src.config import settings
 from src.database.postgres.models import Attendance
 from src.students.attendance_entry import service as entry_service
+from src.gsheet.refresh.service import create_credentials
 
 client = TestClient(app)
 
@@ -16,6 +20,7 @@ class TestAttendanceEntry:
         
         try:
             entry_service.load_allowed_emails.cache_clear()
+            entry_service.load_email_whitelist.cache_clear()
         except Exception:
             pass
 
@@ -29,6 +34,28 @@ class TestAttendanceEntry:
             "https://docs.google.com/spreadsheets/d/TEST_SHEET/edit?gid=0#gid=0",
         )
 
+    @pytest.mark.integration
+    @pytest.mark.gsheet
+    def test_gsheet_whitelist_fetch(self):
+        """ Test whitelist is fetch correctly, uses Test Worksheet """
+        # Only change the key argument
+        df = pd.DataFrame({
+            "email": ["example1@email.com", "example2@email.com", "example3@email.com"]
+        })
+        # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
+        gc = create_credentials()
+        sh = gc.open_by_key(settings.test_sheet_key)
+        whitelist = sh.worksheet(settings.sa_whitelist)
+        set_with_dataframe(whitelist, df)
+        # Verify email list is fetched correctly
+        email_cache = entry_service.load_email_whitelist(settings.test_sheet_key, settings.sa_whitelist)
+        assert len(email_cache) == 3
+        assert "example1@email.com" in email_cache
+        assert "example2@email.com" in email_cache
+        assert "example3@email.com" in email_cache
+
+
+    # NOTE: Not needed after full implementation
     def test_normalize_google_sheet_url(self):
         """ Test normalization of Google Sheets URLs """
 
