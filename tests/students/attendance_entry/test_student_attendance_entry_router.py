@@ -16,10 +16,8 @@ client = TestClient(app)
 class TestAttendanceEntry:
 
     def setup_method(self):
-        ''' Clear cache before each test '''
-        
+        ''' Clear cache before each test ''' 
         try:
-            entry_service.load_allowed_emails.cache_clear()
             entry_service.load_email_whitelist.cache_clear()
         except Exception:
             pass
@@ -27,12 +25,7 @@ class TestAttendanceEntry:
     @pytest.fixture(autouse=True)
     def override_settings(self, monkeypatch):
         """ Override settings for tests """
-
         monkeypatch.setattr("src.config.settings.attendance_api_key", "TEST_KEY")
-        monkeypatch.setattr(
-            "src.config.settings.allowed_sas_sheet_url",
-            "https://docs.google.com/spreadsheets/d/TEST_SHEET/edit?gid=0#gid=0",
-        )
 
     @pytest.mark.integration
     @pytest.mark.gsheet
@@ -53,25 +46,6 @@ class TestAttendanceEntry:
         assert "example2@email.com" in email_cache
         assert "example3@email.com" in email_cache
 
-
-    # NOTE: Not needed after full implementation
-    def test_normalize_google_sheet_url(self):
-        """ Test normalization of Google Sheets URLs """
-
-        fn = entry_service.normalize_google_sheet_url
-
-        url1 = "https://docs.google.com/spreadsheets/d/ABC/export?format=csv&gid=123"
-        assert fn(url1) == url1
-
-        url2 = "https://docs.google.com/spreadsheets/d/XYZ/edit?gid=456#gid=456"
-        assert (
-            fn(url2)
-            == "https://docs.google.com/spreadsheets/d/XYZ/export?format=csv&gid=456"
-        )
-
-        other = "https://example.com/foo?bar=1"
-        assert fn(other) == other
-
     @pytest.mark.parametrize(
         "session_date,start_time,end_time",
         [
@@ -90,7 +64,7 @@ class TestAttendanceEntry:
     ):
         """ Test successful creation of attendance entry """
 
-        # Mock whitelist call
+        # Mock whitelist call, different for each test
         def mock_whitelist():
             return set(["erfanarsala831@gmail.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
@@ -126,7 +100,6 @@ class TestAttendanceEntry:
     def test_invalid_api_key(self, monkeypatch, mock_postgresql_db):
         """ Test request with invalid API key """
 
-        # Mock whitelist call
         def mock_whitelist():
             return set(["x@ex.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
@@ -150,7 +123,6 @@ class TestAttendanceEntry:
     def test_missing_api_key_header(self, monkeypatch, mock_postgresql_db):
         """ Test request missing the API key header """
 
-        # Mock whitelist call
         def mock_whitelist():
             return set(["x@ex.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
@@ -193,7 +165,6 @@ class TestAttendanceEntry:
     def test_end_before_start(self, monkeypatch, mock_postgresql_db):
         """ Test request where session end time is before start time """
         
-        # Mock whitelist call
         def mock_whitelist():
             return set(["ok@ex.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)

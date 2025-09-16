@@ -12,7 +12,9 @@ class Settings(BaseSettings):
     # All env vars should be declared manually, never assume automatic behavior
     # Apart from constants or required env vars, you should verify the values exist at runtime
     app_env: str = Field(validation_alias="APP_ENV", pattern=r'^(development|production)$', default="development")
-    
+    # TODO: Convert this into a general purpose API key
+    attendance_api_key: Optional[str] = Field(default=None, validation_alias="ATTENDANCE_API_KEY")
+
     # Database Connection Strings, required for Database operations
     # TODO: Validate these as connection strings, with user, pass, db, and host
     cti_mongo_url: Optional[str] = Field(validation_alias="CTI_MONGO_URL", default=None)
@@ -48,12 +50,6 @@ class Settings(BaseSettings):
     canvas_api_url: str = "https://cti-courses.test.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
     sa_whitelist: str = "SA Whitelist"
-
-    # UNDER REVIEW
-    # SA's Sheet URL for allowed emails and form submissions password
-    allowed_sas_sheet_url: Optional[str] = Field(default=None, validation_alias="ALLOWED_SAS_SHEET_URL")
-    attendance_password: Optional[str] = Field(default=None, validation_alias="ATTENDANCE_PASSWORD")
-    attendance_api_key: Optional[str] = Field(default=None, validation_alias="ATTENDANCE_API_KEY")
 
 settings = Settings()
 

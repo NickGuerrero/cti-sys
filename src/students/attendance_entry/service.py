@@ -67,34 +67,6 @@ def parse_session_datetimes(entry: AttendanceEntryRequest) -> Tuple[datetime, da
         )
     return start_dt, end_dt
 
-
-def normalize_google_sheet_url(raw_url: str) -> str:
-    """
-    Normalize a Google Sheets URL to its CSV export form.
-    If the input is already an export URL, return it unchanged.
-    If it's an edit/view link, rewrite it to export?format=csv&gid=<gid>.
-    """
-    if "docs.google.com/spreadsheets" not in raw_url:
-        return raw_url  # not a Google Sheets URL, just return as-is
-
-    if "export" in raw_url:
-        return raw_url  # already normalized
-
-    parsed = urlparse(raw_url)
-    parts = parsed.path.split("/")
-    try:
-        sheet_id = parts[3]  # /spreadsheets/d/<sheet_id>/
-    except IndexError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid Google Sheet URL: {raw_url}",
-        )
-
-    qs = parse_qs(parsed.query)
-    gid = qs.get("gid", ["0"])[0]
-
-    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
-
 @lru_cache(maxsize=1)
 def load_email_whitelist(sheet_key=settings.roster_sheet_key, worksheet=settings.sa_whitelist) -> Set[str]:
     """
@@ -109,54 +81,6 @@ def load_email_whitelist(sheet_key=settings.roster_sheet_key, worksheet=settings
     # Convert it into a set for the cache
     df = get_as_dataframe(whitelist)
     return set(df["email"])
-
-
-@lru_cache(maxsize=1)
-def load_allowed_emails() -> Set[str]:
-    """
-    Fetch the allow-list from a public Google Sheet CSV.
-    Expects a header row that includes an 'email' column.
-    Caches the result in memory for the process lifetime.
-    """
-    raw_url = (settings.allowed_sas_sheet_url or "").strip()
-    if not raw_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server misconfigured: ALLOWED_SAS_SHEET_URL is not set",
-        )
-
-    url = normalize_google_sheet_url(raw_url)
-
-    try:
-        resp = requests.get(url, timeout=10, headers={"User-Agent": "cti-attendance/1.0"})
-        resp.raise_for_status()
-        text = resp.content.decode("utf-8-sig")
-    except Exception as ex:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch allow-list sheet: {ex}",
-        )
-
-    reader = csv.reader(io.StringIO(text))
-    try:
-        headers = next(reader)
-    except StopIteration:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Allow-list sheet is empty",
-        )
-
-    lower_map = {h.strip().lower(): i for i, h in enumerate(headers)}
-    idx = lower_map.get("email", 0)
-
-    emails = set()
-    for row in reader:
-        if not row or idx >= len(row):
-            continue
-        val = (row[idx] or "").strip().lower()
-        if val:
-            emails.add(val)
-    return emails
 
 
 def process_session_submission(db: Session, entry: AttendanceEntryRequest) -> Dict[str, Any]:
