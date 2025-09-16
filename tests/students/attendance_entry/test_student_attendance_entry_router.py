@@ -38,11 +38,10 @@ class TestAttendanceEntry:
     @pytest.mark.gsheet
     def test_gsheet_whitelist_fetch(self):
         """ Test whitelist is fetch correctly, uses Test Worksheet """
-        # Only change the key argument
+        # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
         df = pd.DataFrame({
             "email": ["example1@email.com", "example2@email.com", "example3@email.com"]
         })
-        # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
         gc = create_credentials()
         sh = gc.open_by_key(settings.test_sheet_key)
         whitelist = sh.worksheet(settings.sa_whitelist)
@@ -91,15 +90,10 @@ class TestAttendanceEntry:
     ):
         """ Test successful creation of attendance entry """
 
-        # Inline mock response for allow-list
-        class Response:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self):
-                return b"email\nerfanarsala831@gmail.com\n"
-
-        monkeypatch.setattr("requests.get", lambda *a, **k: Response())
+        # Mock whitelist call
+        def mock_whitelist():
+            return set(["erfanarsala831@gmail.com"])
+        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
         mock_postgresql_db.add.return_value = None
         mock_postgresql_db.commit.return_value = None
@@ -132,14 +126,10 @@ class TestAttendanceEntry:
     def test_invalid_api_key(self, monkeypatch, mock_postgresql_db):
         """ Test request with invalid API key """
 
-        class Response:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self):
-                return b"email\nx@ex.com\n"
-
-        monkeypatch.setattr("requests.get", lambda *a, **k: Response())
+        # Mock whitelist call
+        def mock_whitelist():
+            return set(["x@ex.com"])
+        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
         payload = {
             "owner": "x@ex.com",
@@ -160,14 +150,10 @@ class TestAttendanceEntry:
     def test_missing_api_key_header(self, monkeypatch, mock_postgresql_db):
         """ Test request missing the API key header """
 
-        class Response:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self):
-                return b"email\nx@ex.com\n"
-
-        monkeypatch.setattr("requests.get", lambda *a, **k: Response())
+        # Mock whitelist call
+        def mock_whitelist():
+            return set(["x@ex.com"])
+        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
         payload = {
             "owner": "x@ex.com",
@@ -185,14 +171,9 @@ class TestAttendanceEntry:
     def test_not_in_allow_list(self, monkeypatch, mock_postgresql_db):
         """ Test request with email not in allow-list of emails from google sheet """
 
-        class Response:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self):
-                return b"email\nallowed@ex.com\n"
-
-        monkeypatch.setattr("requests.get", lambda *a, **k: Response())
+        def mock_whitelist():
+            return set(["allowed@ex.com"])
+        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
         headers = {"X-CTI-Attendance-Key": "TEST_KEY"}
         payload = {
@@ -212,14 +193,10 @@ class TestAttendanceEntry:
     def test_end_before_start(self, monkeypatch, mock_postgresql_db):
         """ Test request where session end time is before start time """
         
-        class Response:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self):
-                return b"email\nok@ex.com\n"
-
-        monkeypatch.setattr("requests.get", lambda *a, **k: Response())
+        # Mock whitelist call
+        def mock_whitelist():
+            return set(["ok@ex.com"])
+        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
         headers = {"X-CTI-Attendance-Key": "TEST_KEY"}
         payload = {
