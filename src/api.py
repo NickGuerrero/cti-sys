@@ -68,6 +68,7 @@ api_router.include_router(
     prefix="/students/create-attendance-entry",
     tags=["Students"]
 )
+
 # /api/gsheet/refresh/...
 api_router.include_router(
     gsheet_refresh_router,
