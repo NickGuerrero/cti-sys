@@ -107,7 +107,7 @@ def load_email_whitelist(sheet_key=settings.roster_sheet_key, worksheet=settings
     sh = gc.open_by_key(sheet_key)
     whitelist = sh.worksheet(worksheet)
     # Convert it into a set for the cache
-    df = get_as_dataframe(whitelist, names=["email"])
+    df = get_as_dataframe(whitelist)
     return set(df["email"])
 
 
