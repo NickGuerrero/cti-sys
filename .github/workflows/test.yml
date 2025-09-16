@@ -5,6 +5,20 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      CTI_POSTGRES_URL: ${{ secrets.CTI_POSTGRES_URL }}
+      CTI_MONGO_URL: ${{ secrets.CTI_MONGO_URL }}
+      CTI_ACCESS_TOKEN: ${{ secrets.CTI_ACCESS_TOKEN }}
+      APP_ENV: ${{ secrets.APP_ENV }}
+      ATTENDANCE_API_KEY: ${{ secrets.ATTENDANCE_API_KEY }}
+      COURSE_ID_UNTERVIEW: ${{ secrets.COURSE_ID_UNTERVIEW }}
+      UNTERVIEW_SIS_COURSE_ID: ${{ secrets.UNTERVIEW_SIS_COURSE_ID }}
+      CUR_UNTERVIEW_SIS_SECTION_ID: ${{ secrets.CUR_UNTERVIEW_SIS_SECTION_ID }}
+      CUR_UNTERVIEW_SECTION_ID: ${{ secrets.CUR_UNTERVIEW_SECTION_ID }}
+      COURSE_ID_101: ${{ secrets.COURSE_ID_101 }}
+      COMMITMENT_QUIZ_ID: ${{ secrets.COMMITMENT_QUIZ_ID }}
+      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+      SENDGRID_SENDER: ${{ secrets.SENDGRID_SENDER }}
 
     steps:
     - uses: actions/checkout@v2
@@ -18,14 +32,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-
-    - name: Set environment variables
-      env:
-        CTI_POSTGRES_URL: ${{ secrets.CTI_POSTGRES_URL }}
-        CTI_MONGO_URL: ${{ secrets.CTI_MONGO_URL }}
-      run: | 
-        echo "CTI_POSTGRES_URL=${{ secrets.CTI_POSTGRES_URL }}" >> $GITHUB_ENV
-        echo "CTI_MONGO_URL=${{ secrets.CTI_MONGO_URL }}" >> $GITHUB_ENV
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV

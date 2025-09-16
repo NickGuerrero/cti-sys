@@ -1,8 +1,11 @@
 from sqlalchemy import (
     Integer, String, Date, Boolean, DateTime, Float,
-    ForeignKey, func, Index
+    ForeignKey, func, Index, select
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.sql import case
+from sqlalchemy.dialects.postgresql import array_agg
 from datetime import datetime, date
 from typing import List, Optional
 
@@ -23,6 +26,12 @@ from src.database.postgres.core import Base
 ###
 # Core Student Data: Shared across all programs
 ###
+class Ethnicity(Base):
+    __tablename__ = "ethnicities"
+    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
+    ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
+    eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
+
 class Student(Base):
     __tablename__ = "students"
     cti_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
@@ -48,6 +57,29 @@ class Student(Base):
     accelerate_record: Mapped["Accelerate"] = relationship(back_populates="acc_owner", cascade="all, delete-orphan")
     # Note: Attendance relationship removed, use joins for explicit attendance processes
 
+    # Mapped Attributes
+    @hybrid_property
+    def fullname(self):
+        if self.pname is not None:
+            return self.pname + " " + self.lname
+        else:
+            return self.fname + " " + self.lname
+    @fullname.expression
+    def fullname(cls):
+        return case(
+            (cls.pname != None, cls.pname + " " + cls.lname),
+            else_=cls.fname + cls.lname,
+        )
+    
+    ethnicities_agg: Mapped[Optional[List[str]]] = column_property(
+        select(
+            array_agg(Ethnicity.ethnicity)
+        )
+        .where(Ethnicity.cti_id == cti_id)
+        .correlate_except(Ethnicity)
+        .scalar_subquery()
+    )
+
 class StudentEmail(Base):
     __tablename__ = "student_emails"
     email: Mapped[str] = mapped_column(String, primary_key=True)
@@ -70,12 +102,6 @@ class CanvasID(Base):
         # Index on Canvas ID
         Index("unique_canvas_id", "canvas_id", unique=True),
     )
-
-class Ethnicity(Base):
-    __tablename__ = "ethnicities"
-    cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
-    ethnicity: Mapped[str] = mapped_column(String, default="DNE", primary_key=True)
-    eth_owner: Mapped["Student"] = relationship(back_populates="ethnicities")
 
 ##################################
 # Attendance Data
