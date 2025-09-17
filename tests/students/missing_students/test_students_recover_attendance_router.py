@@ -47,7 +47,6 @@ class TestRecoverAttendance:
             name="Foo User",
             session_id=10,
             peardeck_score=0.8,
-            attended_minutes=30
         )
         matches = [(missing_row, 123)]
 
@@ -98,14 +97,12 @@ class TestRecoverAttendance:
             name="Alice User",
             session_id=20,
             peardeck_score=0.9,
-            attended_minutes=25
         )
         missing_row2 = SimpleNamespace(
             email="bob@example.com",
             name="Bob User",
             session_id=30,
             peardeck_score=0.7,
-            attended_minutes=40
         )
         matches = [(missing_row1, 111), (missing_row2, 222)]
 
@@ -157,7 +154,6 @@ class TestRecoverAttendance:
             name="Bar User",
             session_id=5,
             peardeck_score=0.5,
-            attended_minutes=15
         )
         matches = [(dummy_row, 456)]
 
