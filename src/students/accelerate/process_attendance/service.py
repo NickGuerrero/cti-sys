@@ -54,7 +54,7 @@ def load_attendance_rows(
     """
     Pull raw session scores for the supplied student ids.
 
-    Each tuple in the list is (cti_id, session_date, session_score).
+    Each tuple in the list is (cti_id, session_date).
     """
     if not cti_ids:
         return []
@@ -64,7 +64,6 @@ def load_attendance_rows(
             select(
                 StudentAttendance.cti_id,
                 Attendance.session_start,
-                StudentAttendance.session_score,
             )
             .join(Attendance, Attendance.session_id == StudentAttendance.session_id)
             .where(StudentAttendance.cti_id.in_(cti_ids))
