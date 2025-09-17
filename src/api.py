@@ -7,6 +7,7 @@ from src.students.alternate_emails.router import router as student_alternate_ema
 from src.students.attendance_log.router import router as student_attendance_log_router
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
 from src.students.missing_students.router import router as student_recover_attendance_router
+from src.students.attendance_entry.router import router as student_attendance_entry_router
 from src.gsheet.refresh.router import router as gsheet_refresh_router
 
 
@@ -33,31 +34,38 @@ api_router.include_router(
     tags=["Applications"]
 )
 
-# /api/students/alternate-emails...
+# /api/students/alternate-emails
 api_router.include_router(
     student_alternate_emails_router,
     prefix="/students/alternate-emails",
     tags=["Students"]
 )
 
-# /api/students/process-attendance-log...
+# /api/students/process-attendance-log
 api_router.include_router(
     student_attendance_log_router,
     prefix="/students/process-attendance-log",
     tags=["Students"]
 )
 
-# /api/accelerate/process-attendance...
+# /api/accelerate/process-attendance
 api_router.include_router(
     accelerate_attendance_record_router,
     prefix="/students/accelerate/process-attendance",
     tags=["Accelerate"]
 )
 
-# /api/students/recover-attendance...
+# /api/students/recover-attendance
 api_router.include_router(
     student_recover_attendance_router,
     prefix="/students/recover-attendance",
+    tags=["Students"]
+)
+
+# /api/students/create-attendance-entry
+api_router.include_router(
+    student_attendance_entry_router,
+    prefix="/students/create-attendance-entry",
     tags=["Students"]
 )
 

@@ -8,7 +8,10 @@ from src.database.postgres.models import Student, Accelerate, StudentEmail, Canv
 import gspread
 import pandas
 from os import environ
+from src.config import settings
 
+# TODO: Move this into a general utilities file
+# This was put here intially, since we didn't expect to have GSheet operations outside this class
 def create_credentials():
     """
     Create GSheet credentials from an environment variable
@@ -20,15 +23,15 @@ def create_credentials():
     """
     credentials = {
         "type": "service_account",
-        "project_id": environ.get("GS_PROJECT_ID"),
-        "private_key_id": environ.get("GS_PRIVATE_KEY_ID"),
-        "private_key": environ.get("GS_PRIVATE_KEY"),
-        "client_email": environ.get("GS_CLIENT_EMAIL"),
-        "client_id": environ.get("GS_CLIENT_ID"),
+        "project_id": settings.gs_project_id,
+        "private_key_id": settings.gs_private_key_id,
+        "private_key": settings.gs_private_key,
+        "client_email": settings.gs_client_email,
+        "client_id": settings.gs_client_id,
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": environ.get("GS_509_CERT_URL"),
+        "client_x509_cert_url": settings.gs_509_cert_url,
         "universe_domain": "googleapis.com"
     }
     gc = gspread.service_account_from_dict(credentials)
@@ -46,7 +49,7 @@ def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str,
     @param sh: The Google Sheet ID (Retrieved from the URL)
     """
     # Important: Enable both Google Drive and Google Sheet API for the key
-    sh = gc.open_by_key(environ.get("ROSTER_SHEET_KEY"))
+    sh = gc.open_by_key(settings.roster_sheet_key)
     worksheet = sh.worksheet(worksheet_name)
     worksheet.update([data.columns.values.tolist()] + data.values.tolist())
     return {
