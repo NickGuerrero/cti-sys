@@ -89,6 +89,7 @@ def process_attendance_record(
         )
 
     attendance_record.last_processed_date = datetime.now()
+    attendance_record.student_count = len(df)
 
 def process_attendance_row(
     row_data: pd.Series,
@@ -126,8 +127,14 @@ def process_attendance_row(
 
     total_slides = len(slide_columns)
     peardeck_score = answered_count / total_slides if total_slides else 0.0
-    session_score = peardeck_score
-    attended_minutes = -1
+    
+    # Check if first and last slide columns are not empty or 'nan'
+    if total_slides >= 1:
+        first_slide_val = str(row_data.get(slide_columns[0], "")).strip().lower()
+        last_slide_val = str(row_data.get(slide_columns[-1], "")).strip().lower()
+        full_att = bool(first_slide_val and first_slide_val != "nan" and last_slide_val and last_slide_val != "nan")
+    else:
+        full_att = False
 
     # Attempt to find the student by email
     email_record = (
@@ -137,15 +144,28 @@ def process_attendance_row(
     )
 
     if not email_record:
-        # If there's no matching student, insert into missing_attendance
-        missing = MissingAttendance(
-            email=email,
-            session_id=session_id,
-            name=name,
-            peardeck_score=peardeck_score,
-            attended_minutes=attended_minutes
+        # Check if MissingAttendance already exists for this email and session
+        existing_missing = (
+            db.query(MissingAttendance)
+            .filter(
+                func.lower(MissingAttendance.email) == email,
+                MissingAttendance.session_id == session_id
+            )
+            .first()
         )
-        db.merge(missing)
+        
+        if not existing_missing:
+            # If there's no matching student, insert into missing_attendance
+            missing = MissingAttendance(
+                email=email,
+                session_id=session_id,
+                name=name,
+                peardeck_score=peardeck_score,
+                full_attendance=full_att,
+            )
+            db.merge(missing)
+        
+        # Always send the email notification
         background_tasks.add_task(
             send_email_notification,
             email,
@@ -154,7 +174,7 @@ def process_attendance_row(
             <p>Hi {name},</p>
             <p>We couldn't find <strong>{email}</strong> in our records.</p>
             <p>Please <a href="https://docs.google.com/forms/d/e/1FAIpQLSe6KnTqeAi_VwAZ2yKl6-Zuu2w0Jedi9dr0KDRd2c6YKrfTjA/viewform">
-               click here</a> to submit your correct email address.</p>
+            click here</a> to submit your correct email address.</p>
             """
         )
     else:
@@ -170,15 +190,13 @@ def process_attendance_row(
         )
         if existing_attendance:
             existing_attendance.peardeck_score = peardeck_score
-            existing_attendance.attended_minutes = attended_minutes
-            existing_attendance.session_score = session_score
+            existing_attendance.full_attendance = full_att
         else:
             new_attendance = StudentAttendance(
                 cti_id=cti_id,
                 session_id=session_id,
                 peardeck_score=peardeck_score,
-                attended_minutes=attended_minutes,
-                session_score=session_score
+                full_attendance=full_att,
             )
             db.add(new_attendance)
 

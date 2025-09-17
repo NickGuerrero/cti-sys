@@ -11,7 +11,7 @@ def insert_attendance(
     cti_id: int,
     session_id: int,
     peardeck_score: float,
-    attended_minutes: int
+    full_attendance: bool,
 ) -> None:
     """
     Insert a new StudentAttendance record with the given fields.
@@ -22,8 +22,7 @@ def insert_attendance(
             cti_id=cti_id,
             session_id=session_id,
             peardeck_score=peardeck_score,
-            attended_minutes=attended_minutes,
-            session_score=peardeck_score,  # treat session_score same as peardeck_score
+            full_attendance=full_attendance,
         )
     )
 
@@ -62,11 +61,8 @@ def process_matches(
 
         # Safe defaults if any fields are None
         score = missing_row.peardeck_score if missing_row.peardeck_score is not None else 0.0
-        minutes = (
-            missing_row.attended_minutes
-            if missing_row.attended_minutes is not None
-            else -1
-        )
+        full_att = missing_row.full_attendance if missing_row.full_attendance is not None else False 
+
 
         # Check if StudentAttendance already exists for (cti_id, session_id)
         existing = (
@@ -77,7 +73,7 @@ def process_matches(
 
         # If no existing record, insert new StudentAttendance
         if not existing:
-            insert_attendance(db, cti_id, sid, score, minutes)
+            insert_attendance(db, cti_id, sid, score, full_att)
             delete_missing(db, missing_row.email, sid)
 
             # Record the moved row details
