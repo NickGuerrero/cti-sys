@@ -10,7 +10,7 @@ jobs:
       CTI_MONGO_URL: ${{ secrets.CTI_MONGO_URL }}
       CTI_ACCESS_TOKEN: ${{ secrets.CTI_ACCESS_TOKEN }}
       APP_ENV: ${{ secrets.APP_ENV }}
-      CTI_SYS_ADMIN_KEY: ${{ secrets.CTI_SYS_ADMIN_KEY }}
+      ATTENDANCE_API_KEY: ${{ secrets.ATTENDANCE_API_KEY }}
       COURSE_ID_UNTERVIEW: ${{ secrets.COURSE_ID_UNTERVIEW }}
       UNTERVIEW_SIS_COURSE_ID: ${{ secrets.UNTERVIEW_SIS_COURSE_ID }}
       CUR_UNTERVIEW_SIS_SECTION_ID: ${{ secrets.CUR_UNTERVIEW_SIS_SECTION_ID }}
