@@ -117,6 +117,7 @@ class Attendance(Base):
     link: Mapped[str] = mapped_column(String) # URL
     owner: Mapped[str] = mapped_column(String) # Who owns the file
     last_processed_date: Mapped[Optional[datetime]] = mapped_column(DateTime) # null means not processed
+    student_count: Mapped[int] = mapped_column(Integer, nullable=True) # Number of students attended
     # Relationships
     attendances: Mapped[List["StudentAttendance"]] = relationship(back_populates="session")
     missing_records: Mapped[List["MissingAttendance"]] = relationship(back_populates="session")
@@ -126,8 +127,7 @@ class StudentAttendance(Base):
     cti_id: Mapped[int] = mapped_column(ForeignKey("students.cti_id", ondelete="CASCADE"), primary_key=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("attendance.session_id"), primary_key=True)
     peardeck_score: Mapped[float] = mapped_column(Float(3), default=0)
-    attended_minutes: Mapped[int] = mapped_column(Integer, default=0)
-    session_score: Mapped[float] = mapped_column(Float(3), default=0)
+    full_attendance: Mapped[bool] = mapped_column(Boolean, default=False)
     # Relationships
     session: Mapped["Attendance"] = relationship(back_populates="attendances")
 
@@ -137,7 +137,7 @@ class MissingAttendance(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("attendance.session_id", ondelete="CASCADE"), primary_key=True)
     name: Mapped[Optional[str]] = mapped_column(String)
     peardeck_score: Mapped[Optional[int]] = mapped_column(Float(3))
-    attended_minutes: Mapped[Optional[int]] = mapped_column(Integer)
+    full_attendance: Mapped[bool] = mapped_column(Boolean, default=False)
     # Relationships
     session: Mapped["Attendance"] = relationship(back_populates="missing_records")
 

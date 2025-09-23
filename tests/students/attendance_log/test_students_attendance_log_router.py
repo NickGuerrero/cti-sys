@@ -466,3 +466,156 @@ class TestProcessAttendanceLog:
         assert missing_obj.email == "unknownuser@example.com"
         assert missing_obj.session_id == 999
         assert missing_obj.name == "Unknown User"
+
+    def test_student_count_multiple_students(self, monkeypatch, mock_postgresql_db):
+        """
+        Ensure that student_count reflects the number of rows in the CSV.
+        """
+        attendance_row = Attendance(
+            session_id=101,
+            link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/STUDENT_COUNT_DOC/edit?gid=0#gid=0",
+            last_processed_date=None
+        )
+
+        # Mock DB to return our attendance row
+        query_mock = mock_postgresql_db.query.return_value
+        filter_mock = query_mock.filter.return_value
+        filter_mock_2 = filter_mock.filter.return_value
+        filter_mock_2.all.return_value = [attendance_row]
+
+        mock_postgresql_db.commit.return_value = None
+        mock_postgresql_db.rollback.return_value = None
+
+        # CSV with 3 student rows
+        csv_data = b"""Name,Email,Slide 1,Slide 2
+    Alice,alice@example.com,Yes,No
+    Bob,bob@example.com,Yes,Yes
+    Charlie,charlie@example.com,No,Yes
+    """
+
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self): pass
+            @property
+            def content(self): return csv_data
+
+        def mock_requests_get(url, *args, **kwargs):
+            return MockResponse()
+
+        monkeypatch.setattr("requests.get", mock_requests_get)
+
+        # Call endpoint
+        response = client.post("/api/students/process-attendance-log")
+        assert response.status_code == 200
+        resp_json = response.json()
+
+        # One sheet processed, none failed
+        assert resp_json["sheets_processed"] == 1
+        assert resp_json["sheets_failed"] == 0
+
+        # student_count should equal number of CSV rows (3)
+        assert attendance_row.student_count == 3
+
+
+    def test_full_attendance_true(self, monkeypatch, mock_postgresql_db):
+        attendance_row = Attendance(
+            session_id=303,
+            link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/FULL_ATT_DOC/edit?gid=0#gid=0",
+            last_processed_date=None
+        )
+
+        query_mock = mock_postgresql_db.query.return_value
+        filter_mock = query_mock.filter.return_value
+        filter_mock_2 = filter_mock.filter.return_value
+        filter_mock_2.all.return_value = [attendance_row]
+
+        mock_postgresql_db.commit.return_value = None
+        mock_postgresql_db.rollback.return_value = None
+
+        # CSV where first and last slides are non-empty
+        csv_data = b"""Name,Email,Slide 1,Slide 2,Slide 3
+    Student One,student1@example.com,Yes,No,Yes
+    """
+
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self): pass
+            @property
+            def content(self): return csv_data
+
+        def mock_requests_get(url, *args, **kwargs):
+            return MockResponse()
+
+        monkeypatch.setattr("requests.get", mock_requests_get)
+
+        student_email = MagicMock(cti_id=1)
+        filter_mock.first.side_effect = [student_email, None]
+
+        mock_attendance_obj = []
+        mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
+
+        response = client.post("/api/students/process-attendance-log")
+        assert response.status_code == 200
+        resp_json = response.json()
+
+        assert resp_json["sheets_processed"] == 1
+        assert resp_json["sheets_failed"] == 0
+
+        assert len(mock_attendance_obj) == 1
+        assert mock_attendance_obj[0].full_attendance is True
+
+
+    def test_full_attendance_false(self, monkeypatch, mock_postgresql_db):
+        """
+        A student should have full_attendance=False if either the first or last slide is blank.
+        """
+        attendance_row = Attendance(
+            session_id=404,
+            link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/PARTIAL_ATT_DOC/edit?gid=0#gid=0",
+            last_processed_date=None
+        )
+
+        query_mock = mock_postgresql_db.query.return_value
+        filter_mock = query_mock.filter.return_value
+        filter_mock_2 = filter_mock.filter.return_value
+        filter_mock_2.all.return_value = [attendance_row]
+
+        mock_postgresql_db.commit.return_value = None
+        mock_postgresql_db.rollback.return_value = None
+
+        # CSV where first slide is answered but last slide is blank
+        csv_data = b"""Name,Email,Slide 1,Slide 2,Slide 3
+    Student Two,student2@example.com,Yes,Maybe,
+    """
+
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self): pass
+            @property
+            def content(self): return csv_data
+
+        def mock_requests_get(url, *args, **kwargs):
+            return MockResponse()
+
+        monkeypatch.setattr("requests.get", mock_requests_get)
+
+        student_email = MagicMock(cti_id=2)
+        filter_mock.first.side_effect = [student_email, None]
+
+        mock_attendance_obj = []
+        mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
+
+        response = client.post("/api/students/process-attendance-log")
+        assert response.status_code == 200
+        resp_json = response.json()
+
+        assert resp_json["sheets_processed"] == 1
+        assert resp_json["sheets_failed"] == 0
+
+        # Verify StudentAttendance was created with full_attendance=False
+        assert len(mock_attendance_obj) == 1
+        assert mock_attendance_obj[0].full_attendance is False
+
