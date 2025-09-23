@@ -15,17 +15,10 @@ client = TestClient(app)
 
 class TestAttendanceEntry:
 
-    def setup_method(self):
-        ''' Clear cache before each test ''' 
-        try:
-            entry_service.load_email_whitelist.cache_clear()
-        except Exception:
-            pass
-
     @pytest.fixture(autouse=True)
     def override_settings(self, monkeypatch):
         """ Override settings for tests """
-        monkeypatch.setattr("src.config.settings.attendance_api_key", "TEST_KEY")
+        monkeypatch.setattr("src.config.settings.cti_sys_admin_key", "TEST_KEY")
 
     @pytest.mark.integration
     @pytest.mark.gsheet
@@ -83,7 +76,7 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        headers = {"X-CTI-Attendance-Key": "TEST_KEY"}
+        headers = {"Authorization": "Bearer TEST_KEY"}
 
         resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
         assert resp.status_code == 200
@@ -114,7 +107,7 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        headers = {"X-CTI-Attendance-Key": "WRONG_KEY"}
+        headers = {"Authorization": "Bearer WRONG_KEY"}
 
         resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
         assert resp.status_code == 401
@@ -138,7 +131,7 @@ class TestAttendanceEntry:
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
         resp = client.post("/api/students/create-attendance-entry", json=payload)
-        assert resp.status_code == 422
+        assert resp.status_code == 403
 
     def test_not_in_allow_list(self, monkeypatch, mock_postgresql_db):
         """ Test request with email not in allow-list of emails from google sheet """
@@ -147,7 +140,7 @@ class TestAttendanceEntry:
             return set(["allowed@ex.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
-        headers = {"X-CTI-Attendance-Key": "TEST_KEY"}
+        headers = {"Authorization": "Bearer TEST_KEY"}
         payload = {
             "owner": "blocked@ex.com",
             "program": "Accelerate",
@@ -169,7 +162,7 @@ class TestAttendanceEntry:
             return set(["ok@ex.com"])
         monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
 
-        headers = {"X-CTI-Attendance-Key": "TEST_KEY"}
+        headers = {"Authorization": "Bearer TEST_KEY"}
         payload = {
             "owner": "ok@ex.com",
             "program": "Accelerate",
