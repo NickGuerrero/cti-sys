@@ -1,25 +1,12 @@
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
-from gspread_dataframe import get_as_dataframe, set_with_dataframe
+from gspread_dataframe import set_with_dataframe
 import pandas as pd
-
-from src.main import app
 from src.config import settings
-from src.database.postgres.models import Attendance
 from src.students.attendance_entry import service as entry_service
 from src.gsheet.refresh.service import create_credentials
 
-client = TestClient(app)
-
-
 class TestAttendanceEntry:
-
-    @pytest.fixture(autouse=True)
-    def override_settings(self, monkeypatch):
-        """ Override settings for tests """
-        monkeypatch.setattr("src.config.settings.cti_sys_admin_key", "TEST_KEY")
-
     @pytest.mark.integration
     @pytest.mark.gsheet
     def test_gsheet_whitelist_fetch(self):
@@ -49,18 +36,21 @@ class TestAttendanceEntry:
     )
     def test_create_attendance_entry_success(
         self,
+        client,
         session_date,
         start_time,
         end_time,
         monkeypatch,
         mock_postgresql_db,
+        auth_headers,
     ):
         """ Test successful creation of attendance entry """
 
         # Mock whitelist call, different for each test
-        def mock_whitelist():
-            return set(["erfanarsala831@gmail.com"])
-        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
+        monkeypatch.setattr(
+            "src.students.attendance_entry.service.load_email_whitelist",
+            MagicMock(return_value={"erfanarsala831@gmail.com"})
+        )
 
         mock_postgresql_db.add.return_value = None
         mock_postgresql_db.commit.return_value = None
@@ -76,9 +66,7 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        headers = {"Authorization": "Bearer TEST_KEY"}
-
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == 200
@@ -90,12 +78,17 @@ class TestAttendanceEntry:
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.refresh.assert_called_once()
 
-    def test_invalid_api_key(self, monkeypatch, mock_postgresql_db):
-        """ Test request with invalid API key """
-
-        def mock_whitelist():
-            return set(["x@ex.com"])
-        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
+    @pytest.mark.parametrize("token,expected_status", [
+        ("TEST_KEY", 200), # valid key
+        ("WRONG_KEY", 401), # invalid key
+        (None, 403), # missing key
+    ])
+    def test_api_key_cases(self, client, monkeypatch, token, expected_status):
+        """ Test request with valid, invalid, and missing API keys """
+        monkeypatch.setattr(
+            "src.students.attendance_entry.service.load_email_whitelist",
+            MagicMock(return_value={"x@ex.com"})
+        )
 
         payload = {
             "owner": "x@ex.com",
@@ -107,40 +100,21 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        headers = {"Authorization": "Bearer WRONG_KEY"}
 
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
         resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
-        assert resp.status_code == 401
-        assert "Invalid or missing API key" in resp.text
 
-    def test_missing_api_key_header(self, monkeypatch, mock_postgresql_db):
-        """ Test request missing the API key header """
+        assert resp.status_code == expected_status
+        if expected_status == 401:
+            assert "Invalid or missing API key" in resp.text
 
-        def mock_whitelist():
-            return set(["x@ex.com"])
-        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
-
-        payload = {
-            "owner": "x@ex.com",
-            "program": "Accelerate",
-            "session_type": "Guided",
-            "session_date": "06/16/2024",
-            "session_start_time": "10:00 AM",
-            "session_end_time": "11:00 AM",
-            "link_type": "PEARDECK",
-            "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
-        }
-        resp = client.post("/api/students/create-attendance-entry", json=payload)
-        assert resp.status_code == 403
-
-    def test_not_in_allow_list(self, monkeypatch, mock_postgresql_db):
+    def test_not_in_allow_list(self, client, monkeypatch, auth_headers):
         """ Test request with email not in allow-list of emails from google sheet """
+        monkeypatch.setattr(
+            "src.students.attendance_entry.service.load_email_whitelist",
+            MagicMock(return_value={"allowed@ex.com"})
+        )
 
-        def mock_whitelist():
-            return set(["allowed@ex.com"])
-        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
-
-        headers = {"Authorization": "Bearer TEST_KEY"}
         payload = {
             "owner": "blocked@ex.com",
             "program": "Accelerate",
@@ -151,18 +125,17 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
         assert resp.status_code == 403
         assert "Email not authorized" in resp.text
 
-    def test_end_before_start(self, monkeypatch, mock_postgresql_db):
+    def test_end_before_start(self, client, monkeypatch, auth_headers):
         """ Test request where session end time is before start time """
-        
-        def mock_whitelist():
-            return set(["ok@ex.com"])
-        monkeypatch.setattr("src.students.attendance_entry.service.load_email_whitelist", mock_whitelist)
+        monkeypatch.setattr(
+            "src.students.attendance_entry.service.load_email_whitelist",
+            MagicMock(return_value={"ok@ex.com"})
+        )
 
-        headers = {"Authorization": "Bearer TEST_KEY"}
         payload = {
             "owner": "ok@ex.com",
             "program": "Accelerate",
@@ -173,6 +146,6 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
         assert resp.status_code == 400
         assert "must be after" in resp.text
