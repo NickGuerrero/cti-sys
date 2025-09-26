@@ -4,12 +4,30 @@ from mongomock import MongoClient as MockClient
 from pymongo import MongoClient
 import pytest
 from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
 
 from src.config import MONGO_DATABASE_NAME, settings
 from src.database.mongo.core import get_mongo
 from src.database.mongo.service import init_collections
 from src.database.postgres.core import make_session
 from src.main import app
+
+# Fixtures for tests
+@pytest.fixture(scope="session", autouse=True)
+def override_cti_admin_key():
+    """Ensure tests always use a fixed admin API key"""
+    settings.cti_sys_admin_key = "TEST_KEY"
+
+@pytest.fixture
+def auth_headers():
+    """Reusable Authorization header for API requests"""
+    return {"Authorization": "Bearer TEST_KEY"}
+
+@pytest.fixture(scope="session")
+def client():
+    """Shared FastAPI test client"""
+    return TestClient(app)
+
 
 @pytest.fixture(scope="function")
 def mock_mongo_db():

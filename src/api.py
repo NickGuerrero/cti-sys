@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from src.applications.router import router as applications_router
 from src.applications.canvas_export.router import router as canvas_export_router
@@ -9,7 +9,7 @@ from src.students.accelerate.process_attendance.router import router as accelera
 from src.students.missing_students.router import router as student_recover_attendance_router
 from src.students.attendance_entry.router import router as student_attendance_entry_router
 from src.gsheet.refresh.router import router as gsheet_refresh_router
-
+from src.utils.authorization import verify_api_key
 
 api_router = APIRouter()
 
@@ -38,35 +38,40 @@ api_router.include_router(
 api_router.include_router(
     student_alternate_emails_router,
     prefix="/students/alternate-emails",
-    tags=["Students"]
+    tags=["Students"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/process-attendance-log
 api_router.include_router(
     student_attendance_log_router,
     prefix="/students/process-attendance-log",
-    tags=["Students"]
+    tags=["Students"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/accelerate/process-attendance
 api_router.include_router(
     accelerate_attendance_record_router,
     prefix="/students/accelerate/process-attendance",
-    tags=["Accelerate"]
+    tags=["Accelerate"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/recover-attendance
 api_router.include_router(
     student_recover_attendance_router,
     prefix="/students/recover-attendance",
-    tags=["Students"]
+    tags=["Students"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/create-attendance-entry
 api_router.include_router(
     student_attendance_entry_router,
     prefix="/students/create-attendance-entry",
-    tags=["Students"]
+    tags=["Students"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/gsheet/refresh/...

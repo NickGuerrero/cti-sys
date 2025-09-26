@@ -1,11 +1,7 @@
-from fastapi.testclient import TestClient
 import pytest
-
+from unittest.mock import MagicMock
 from src.database.postgres.models import Student, StudentEmail
-from src.main import app
 from src.config import settings
-
-client = TestClient(app)
 
 class TestModifyAlternateEmails:
     # =========================
@@ -13,7 +9,7 @@ class TestModifyAlternateEmails:
     # =========================
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_add_alternate_emails(self, env, monkeypatch, mock_postgresql_db):
+    def test_add_alternate_emails(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
         """Test adding alternate emails for a student."""
         monkeypatch.setattr(settings, "app_env", env)
         student = Student(cti_id=1, fname="Jane", lname="Doe")
@@ -32,7 +28,7 @@ class TestModifyAlternateEmails:
         ])
         monkeypatch.setattr(
             "src.students.alternate_emails.router.fetch_current_emails",
-            lambda email, db: next(calls)
+            MagicMock(side_effect=lambda email, db: next(calls))
         )
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
@@ -51,7 +47,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [new_email_1.email, new_email_2.email],
             "google_form_email": primary_email.email,
             "primary_email": primary_email.email,
@@ -69,7 +65,7 @@ class TestModifyAlternateEmails:
             assert data["primary_email"].lower() == primary_email.email.lower()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_remove_alternate_email_success(self, env, monkeypatch, mock_postgresql_db):
+    def test_remove_alternate_email_success(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
         """Test successfully removing an alternate email."""
         monkeypatch.setattr(settings, "app_env", env)
         student = Student(cti_id=1, fname="Jane", lname="Doe")
@@ -83,7 +79,7 @@ class TestModifyAlternateEmails:
         ])
         monkeypatch.setattr(
             "src.students.alternate_emails.router.fetch_current_emails",
-            lambda email, db: next(calls)
+            MagicMock(side_effect=lambda email, db: next(calls))
         )
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
@@ -100,7 +96,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": [alternate.email],
             "google_form_email": primary.email,
@@ -117,7 +113,7 @@ class TestModifyAlternateEmails:
             assert data["primary_email"].lower() == primary.email.lower()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_update_primary_email(self, env, monkeypatch, mock_postgresql_db):
+    def test_update_primary_email(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test changing the primary email without removing any emails.
         Initially, the student has 'old@example.com' as primary and 'new@example.com' as an alternate.
@@ -135,7 +131,7 @@ class TestModifyAlternateEmails:
         ])
         monkeypatch.setattr(
             "src.students.alternate_emails.router.fetch_current_emails",
-            lambda email, db: next(calls)
+            MagicMock(side_effect=lambda email, db: next(calls))
         )
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
@@ -152,7 +148,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": [],
             "google_form_email": new_email.email,
@@ -170,7 +166,7 @@ class TestModifyAlternateEmails:
             assert data["primary_email"].lower() == new_email.email.lower()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_skip_nonexistent_email_removal(self, env, monkeypatch, mock_postgresql_db):
+    def test_skip_nonexistent_email_removal(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
         """Test that removal skips emails not found in the student record."""
         monkeypatch.setattr(settings, "app_env", env)
         student = Student(cti_id=1, fname="Jane", lname="Doe")
@@ -184,7 +180,7 @@ class TestModifyAlternateEmails:
         ])
         monkeypatch.setattr(
             "src.students.alternate_emails.router.fetch_current_emails",
-            lambda email, db: next(calls)
+            MagicMock(side_effect=lambda email, db: next(calls))
         )
 
         mock_postgresql_db.query.return_value.filter.return_value.first.side_effect = [
@@ -201,7 +197,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": ["notfound@email.com", alt.email],
             "google_form_email": primary.email,
@@ -223,7 +219,7 @@ class TestModifyAlternateEmails:
     # Error Conditions
     # ====================
 
-    def test_add_alternate_email_already_exists(self, mock_postgresql_db):
+    def test_add_alternate_email_already_exists(self, client, mock_postgresql_db, auth_headers):
         """Test error when an alternate email is already associated with another student."""
         student = Student(cti_id=1, fname="Jane", lname="Doe")
         student_email = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
@@ -237,7 +233,7 @@ class TestModifyAlternateEmails:
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [student_email]
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [other_student_email.email],
             "google_form_email": student_email.email,
             "primary_email": student_email.email
@@ -247,11 +243,11 @@ class TestModifyAlternateEmails:
         detail = response.json().get("detail", "")
         assert "already associated with another student" in detail
 
-    def test_student_not_found_by_email(self, mock_postgresql_db):
+    def test_student_not_found_by_email(self, client, mock_postgresql_db, auth_headers):
         """Test error when no student is found for the given Google Form email."""
         mock_postgresql_db.query.return_value.filter.return_value.first.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": ["newalt@email.com"],
             "google_form_email": "notfound@email.com",
             "primary_email": "notfound@email.com"
@@ -260,7 +256,7 @@ class TestModifyAlternateEmails:
         assert response.status_code == 404
         assert "Student not found" in response.json().get("detail", "")
 
-    def test_primary_email_must_match_form_email(self, mock_postgresql_db):
+    def test_primary_email_must_match_form_email(self, client, mock_postgresql_db, auth_headers):
         """Test error when provided primary email does not match the email used in the form."""
         student = Student(cti_id=1, fname="Jane", lname="Doe")
         primary = StudentEmail(email="ngcti@email.com", cti_id=1, is_primary=True)
@@ -273,7 +269,7 @@ class TestModifyAlternateEmails:
         ]
         mock_postgresql_db.query.return_value.filter.return_value.all.return_value = [primary, alternate]
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": [],
             "primary_email": alternate.email,
@@ -284,7 +280,7 @@ class TestModifyAlternateEmails:
         assert "Primary email must match the email used to submit the form" in response.json().get("detail", "")
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_skip_nonexistent_email_removal(self, env, monkeypatch, mock_postgresql_db):
+    def test_skip_nonexistent_email_removal(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
         """Test that removal skips emails not found in the student record."""
         monkeypatch.setattr(settings, "app_env", env)
 
@@ -300,7 +296,7 @@ class TestModifyAlternateEmails:
         ])
         monkeypatch.setattr(
             "src.students.alternate_emails.router.fetch_current_emails",
-            lambda email, db: next(calls)
+            MagicMock(side_effect=lambda email, db: next(calls))
         )
 
         # DB mocks for service.modify()
@@ -318,7 +314,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": ["notfound@email.com", alt.email],
             "google_form_email": primary.email,
@@ -335,7 +331,7 @@ class TestModifyAlternateEmails:
             assert alt.email.lower() not in emails_lower
             assert data["primary_email"].lower() == primary.email.lower()
 
-    def test_update_primary_email_not_found(self, mock_postgresql_db):
+    def test_update_primary_email_not_found(self, client, mock_postgresql_db, auth_headers):
         """
         Test error when update for setting a new primary email fails.
         """
@@ -353,7 +349,7 @@ class TestModifyAlternateEmails:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/alternate-emails", json={
+        response = client.post("/api/students/alternate-emails", headers=auth_headers, json={
             "alt_emails": [],
             "remove_emails": [],
             "google_form_email": primary.email,

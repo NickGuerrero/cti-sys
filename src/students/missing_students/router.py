@@ -9,9 +9,9 @@ from src.config import settings
 from src.database.postgres.core import make_session
 from src.database.postgres.models import MissingAttendance, StudentEmail
 import src.students.missing_students.service as service
+from src.utils.exceptions import handle_db_exceptions 
 
 router = APIRouter()
-
 
 @router.post("", status_code=status.HTTP_200_OK)
 def recover_attendance(db: Session = Depends(make_session)) -> Dict[str, Any]:
@@ -50,6 +50,5 @@ def recover_attendance(db: Session = Depends(make_session)) -> Dict[str, Any]:
         else:
             return {"status": 200, "moved": count, "rows": moved_rows}
 
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        handle_db_exceptions(db, e)

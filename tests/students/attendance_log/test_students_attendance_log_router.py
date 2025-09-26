@@ -1,16 +1,9 @@
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
 from requests.exceptions import HTTPError
-
-from src.main import app
 from src.database.postgres.models import Attendance
 
-client = TestClient(app)
-
-
 class TestProcessAttendanceLog:
-
     @pytest.mark.parametrize(
         "csv_content, expected_processed, expected_failed",
         [
@@ -37,11 +30,13 @@ class TestProcessAttendanceLog:
     )
     def test_process_attendance_log_simple(
         self,
+        client,
         csv_content,
         expected_processed,
         expected_failed,
         monkeypatch,
-        mock_postgresql_db
+        mock_postgresql_db,
+        auth_headers,
     ):
         """
         Test processing of a single attendance row under two conditions:
@@ -69,27 +64,17 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        # This is a mock of the requests.get() response.
-        # It simulates a successful HTTP response with the CSV content.
-        class MockResponse:
-            status_code = 200
-
-            def raise_for_status(self):
-                pass
-
-            @property
-            def content(self):
-                # Encode the multiline CSV string to bytes.
-                return csv_content.encode("utf-8")
-
-        # This function will replace requests.get, returning our MockResponse above.
+        # Use MagicMock for the HTTP response.
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(
+                status_code=200,
+                raise_for_status=lambda: None,
+                content=csv_content.encode("utf-8")
+            )
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        # Call the endpoint to process the attendance log.
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
         assert response.status_code == 200
 
         # Verify the JSON response against our expected success/failure counts.
@@ -103,7 +88,7 @@ class TestProcessAttendanceLog:
         if expected_failed:
             mock_postgresql_db.rollback.assert_called_once()
 
-    def test_multiple_attendance_rows_partial_fail(self, monkeypatch, mock_postgresql_db):
+    def test_multiple_attendance_rows_partial_fail(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test a scenario with multiple attendance rows in the database:
         - 3 valid CSV links, each should process successfully.
@@ -140,7 +125,6 @@ class TestProcessAttendanceLog:
             last_processed_date=None
         )
 
-        # Mock the DB to return these four rows.
         query_mock = mock_postgresql_db.query.return_value
         filter_mock = query_mock.filter.return_value
         filter_mock_2 = filter_mock.filter.return_value
@@ -162,31 +146,21 @@ class TestProcessAttendanceLog:
 
         # Mock the requests.get() method to return different CSV content based on the URL.
         # This simulates the behavior of fetching different CSVs based on the doc ID in the URL.
-        class MockResponse:
-            def __init__(self, content):
-                self._content = content
-                self.status_code = 200
-
-            def raise_for_status(self):
-                pass
-
-            @property
-            def content(self):
-                return self._content
-
         def mock_requests_get(url, *args, **kwargs):
-            # Extract doc ID from the URL to decide which CSV to return.
             try:
                 after_d = url.split("/d/")[1]
                 doc_id = after_d.split("/")[0]
             except IndexError:
                 doc_id = "UNKNOWN"
-            return MockResponse(csv_map.get(doc_id, b""))
+            return MagicMock(
+                status_code=200,
+                raise_for_status=lambda: None,
+                content=csv_map.get(doc_id, b"")
+            )
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        # Call the endpoint to process all attendance rows.
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
         assert response.status_code == 200
         resp_json = response.json()
 
@@ -196,7 +170,7 @@ class TestProcessAttendanceLog:
         assert mock_postgresql_db.commit.call_count == 3
         assert mock_postgresql_db.rollback.call_count == 1
 
-    def test_empty_csv_fails(self, monkeypatch, mock_postgresql_db):
+    def test_empty_csv_fails(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test that an empty CSV string leads to a failure.
 
@@ -221,21 +195,12 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        # Mock a response that has empty content.
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self):
-                pass
-            @property
-            def content(self):
-                return b""
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=b"")
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
         assert response.status_code == 200
         resp_json = response.json()
         # We expect zero processed, one failure.
@@ -243,7 +208,7 @@ class TestProcessAttendanceLog:
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_requests_error(self, monkeypatch, mock_postgresql_db):
+    def test_requests_error(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test that any HTTP-related error (e.g., 403) when fetching CSV
         results in a failure of that sheet.
@@ -266,32 +231,27 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        # Simulate an HTTP error like a 403 response.
         def mock_requests_get(url, *args, **kwargs):
             raise HTTPError("Forbidden")
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
         assert response.status_code == 200
         resp_json = response.json()
         assert resp_json["sheets_processed"] == 0
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_csv_header_only(self, monkeypatch, mock_postgresql_db):
+    def test_csv_header_only(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test that a CSV containing only headers (no data rows) is successfully processed.
 
         - sheets_processed = 1
         - sheets_failed = 0
         """
-        attendance_row = Attendance(
-            session_id=200,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/HEADER_ONLY_DOC/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
+        attendance_row = Attendance(session_id=200, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/HEADER_ONLY_DOC/edit?gid=0#gid=0")
 
         query_mock = mock_postgresql_db.query.return_value
         filter_mock = query_mock.filter.return_value
@@ -301,22 +261,12 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        # Mock a response that has only headers in the CSV.
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self):
-                pass
-            @property
-            def content(self):
-                # CSV with only a header row.
-                return b"Name,Email,Slide\n"
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=b"Name,Email,Slide\n")
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
         assert response.status_code == 200
         resp_json = response.json()
         assert resp_json["sheets_processed"] == 1
@@ -334,7 +284,7 @@ class TestProcessAttendanceLog:
         with pytest.raises(ValueError, match="Unable to parse doc ID from:"):
             convert_google_sheet_link_to_csv(invalid_link)
 
-    def test_unknown_email_goes_to_missing_attendance(self, monkeypatch, mock_postgresql_db):
+    def test_unknown_email_goes_to_missing_attendance(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test that when the email in the CSV is not found in the database,
         the row is recorded in missing_attendance and the sheet is still considered processed.
@@ -357,17 +307,8 @@ class TestProcessAttendanceLog:
         Unknown Only,unknownonly@example.com,SingleRow
         """
 
-        # Mock the DB to return None for the unknown email.
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self):
-                pass
-            @property
-            def content(self):
-                return csv_data
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
 
         monkeypatch.setattr("requests.get", mock_requests_get)
         # Force the DB to find no matching user for unknownonly@example.com
@@ -376,7 +317,8 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+
         assert response.status_code == 200
         resp_json = response.json()
         # Even though the email is unknown, the sheet is still "processed."
@@ -394,7 +336,7 @@ class TestProcessAttendanceLog:
         assert missing_obj.session_id == 555
         assert missing_obj.name == "Unknown Only"
 
-    def test_mixed_known_and_unknown_email(self, monkeypatch, mock_postgresql_db):
+    def test_mixed_known_and_unknown_email(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Test that a CSV row with a known user is not inserted into missing_attendance,
         while a row with an unknown user is inserted.
@@ -423,18 +365,8 @@ class TestProcessAttendanceLog:
         Unknown User,unknownuser@example.com,Another Slide
         """
 
-        # Mock the DB to return a known user for the first email,
-        # and None for the second unknown email.
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self):
-                pass
-            @property
-            def content(self):
-                return csv_data
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
@@ -449,13 +381,15 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+
         assert response.status_code == 200
         resp_json = response.json()
 
         # If we have both known and unknown users, the sheet still "succeeds" overall.
         assert resp_json["sheets_processed"] == 1
         assert resp_json["sheets_failed"] == 0
+
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.rollback.assert_not_called()
 
@@ -467,7 +401,7 @@ class TestProcessAttendanceLog:
         assert missing_obj.session_id == 999
         assert missing_obj.name == "Unknown User"
 
-    def test_student_count_multiple_students(self, monkeypatch, mock_postgresql_db):
+    def test_student_count_multiple_students(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Ensure that student_count reflects the number of rows in the CSV.
         """
@@ -494,19 +428,13 @@ class TestProcessAttendanceLog:
     Charlie,charlie@example.com,No,Yes
     """
 
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self): return csv_data
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        # Call endpoint
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+
         assert response.status_code == 200
         resp_json = response.json()
 
@@ -517,8 +445,10 @@ class TestProcessAttendanceLog:
         # student_count should equal number of CSV rows (3)
         assert attendance_row.student_count == 3
 
-
-    def test_full_attendance_true(self, monkeypatch, mock_postgresql_db):
+    def test_full_attendance_true(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+        """
+        A student should have full_attendance=True if both the first and last slides are non-empty.
+        """
         attendance_row = Attendance(
             session_id=303,
             link_type="PEARDECK",
@@ -539,14 +469,8 @@ class TestProcessAttendanceLog:
     Student One,student1@example.com,Yes,No,Yes
     """
 
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self): return csv_data
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
@@ -556,18 +480,16 @@ class TestProcessAttendanceLog:
         mock_attendance_obj = []
         mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+
         assert response.status_code == 200
         resp_json = response.json()
-
         assert resp_json["sheets_processed"] == 1
         assert resp_json["sheets_failed"] == 0
-
         assert len(mock_attendance_obj) == 1
         assert mock_attendance_obj[0].full_attendance is True
 
-
-    def test_full_attendance_false(self, monkeypatch, mock_postgresql_db):
+    def test_full_attendance_false(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         A student should have full_attendance=False if either the first or last slide is blank.
         """
@@ -591,14 +513,8 @@ class TestProcessAttendanceLog:
     Student Two,student2@example.com,Yes,Maybe,
     """
 
-        class MockResponse:
-            status_code = 200
-            def raise_for_status(self): pass
-            @property
-            def content(self): return csv_data
-
         def mock_requests_get(url, *args, **kwargs):
-            return MockResponse()
+            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
@@ -608,7 +524,8 @@ class TestProcessAttendanceLog:
         mock_attendance_obj = []
         mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
 
-        response = client.post("/api/students/process-attendance-log")
+        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+
         assert response.status_code == 200
         resp_json = response.json()
 
@@ -618,4 +535,3 @@ class TestProcessAttendanceLog:
         # Verify StudentAttendance was created with full_attendance=False
         assert len(mock_attendance_obj) == 1
         assert mock_attendance_obj[0].full_attendance is False
-

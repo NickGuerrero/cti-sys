@@ -1,11 +1,6 @@
-import csv
-import io
 from datetime import datetime
-from functools import lru_cache
 from typing import Any, Dict, Optional, Set, Tuple
 
-import requests
-import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from gspread_dataframe import get_as_dataframe
@@ -14,7 +9,6 @@ from src.config import settings
 from src.gsheet.refresh.service import create_credentials
 from src.database.postgres.models import Attendance
 from src.students.attendance_entry.schemas import AttendanceEntryRequest
-from urllib.parse import urlparse, parse_qs
 
 def detect_date_format(date_str: str) -> str:
     """
@@ -67,12 +61,10 @@ def parse_session_datetimes(entry: AttendanceEntryRequest) -> Tuple[datetime, da
         )
     return start_dt, end_dt
 
-@lru_cache(maxsize=1)
 def load_email_whitelist(sheet_key=settings.roster_sheet_key, worksheet=settings.sa_whitelist) -> Set[str]:
     """
     Fetch the allow-list from the Main Roster
     Expect a header row that includes an 'email' column
-    Caches the result in memory for the process lifetime
     """
     # Fetch the whitelist directly from the Main Roster
     gc = create_credentials()
