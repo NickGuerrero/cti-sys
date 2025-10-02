@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.config import settings
+import hmac
 
 security = HTTPBearer(auto_error=True)
 
@@ -19,7 +20,7 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
             detail="Server misconfigured: missing CTI_SYS_ADMIN_KEY",
         )
 
-    if token != server_key:
+    if not hmac.compare_digest(token, server_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",
