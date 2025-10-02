@@ -1,15 +1,10 @@
-from fastapi.testclient import TestClient
-
-from src.main import app
 from datetime import date, timedelta
-
+from unittest.mock import MagicMock
 from src.database.postgres.models import Accelerate
 from src.students.accelerate.process_attendance import service as svc
 
-client = TestClient(app)
-
 class TestProcessAccelerateAttendance:
-    def test_process_attendance_success(self, monkeypatch, mock_postgresql_db):
+    def test_process_attendance_success(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Simulate a case where two active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written, and the transaction is committed.
@@ -20,12 +15,12 @@ class TestProcessAccelerateAttendance:
         acc_1 = Accelerate(cti_id=1, active=True)
         acc_2 = Accelerate(cti_id=2, active=True)
 
-        monkeypatch.setattr(svc, "load_active_accelerate_records", lambda db: [acc_1, acc_2])
+        monkeypatch.setattr(svc, "load_active_accelerate_records", MagicMock(return_value=[acc_1, acc_2]))
         fake_rows = [
             (1, date(2025, 4, 1), 1.0),
             (2, date(2025, 4, 1), 0.5),
         ]
-        monkeypatch.setattr(svc, "load_attendance_rows", lambda db, ids: fake_rows)
+        monkeypatch.setattr(svc, "load_attendance_rows", MagicMock(return_value=fake_rows))
 
         canned = {
             1: dict(participation_score=1.0, sessions_attended=1, participation_streak=1, inactive_weeks=0),
@@ -36,12 +31,13 @@ class TestProcessAccelerateAttendance:
             first_score = next(iter(weekly.values()))[0]
             return canned[1] if first_score == 1.0 else canned[2]
 
-        monkeypatch.setattr(svc, "metrics_for_student", fake_metrics)
+        monkeypatch.setattr(svc, "metrics_for_student", MagicMock(side_effect=fake_metrics))
 
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        res = client.post("/api/students/accelerate/process-attendance")
+        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
+
         assert res.status_code == 200
         assert res.json() == {"status": 200, "records_updated": 2}
         mock_postgresql_db.commit.assert_called_once()
@@ -50,7 +46,7 @@ class TestProcessAccelerateAttendance:
         assert acc_2.participation_score == 0.5
 
 
-    def test_no_active_students(self, monkeypatch, mock_postgresql_db):
+    def test_no_active_students(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Simulate a case where no active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written,
@@ -58,20 +54,20 @@ class TestProcessAccelerateAttendance:
             - The database is not modified.
             - The attendance rows are empty.
         """
-        monkeypatch.setattr(svc, "load_active_accelerate_records", lambda db: [])
-        monkeypatch.setattr(svc, "load_attendance_rows", lambda db, ids: [])
+        monkeypatch.setattr(svc, "load_active_accelerate_records", MagicMock(return_value=[]))
+        monkeypatch.setattr(svc, "load_attendance_rows", MagicMock(return_value=[]))
 
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        res = client.post("/api/students/accelerate/process-attendance")
+        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
         assert res.status_code == 200
         assert res.json() == {"status": 200, "records_updated": 0}
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.rollback.assert_not_called()
 
 
-    def test_database_error_triggers_rollback(self, monkeypatch, mock_postgresql_db):
+    def test_database_error_triggers_rollback(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """
         Simulate a database error during the transaction.
             - return HTTP-500
@@ -81,15 +77,14 @@ class TestProcessAccelerateAttendance:
         monkeypatch.setattr(
             svc,
             "load_active_accelerate_records",
-            lambda db: (_ for _ in ()).throw(RuntimeError("DB failure")),
+            MagicMock(side_effect=RuntimeError("DB failure")),
         )
 
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
         # Turn server exceptions into HTTP-500 responses.
-        safe_client = TestClient(app, raise_server_exceptions=False)
-        res = safe_client.post("api/students/accelerate/process-attendance")
+        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
 
         assert res.status_code == 500
         mock_postgresql_db.rollback.assert_called_once()
@@ -160,10 +155,6 @@ class TestProcessAccelerateAttendance:
         # Freeze today's date to a fixed date for testing
         today = date(2025, 4, 28)
 
-        # Mock the date.today() method to return a fixed date
-        # This is a workaround for the fact that date.today() is not easily mockable
-        # in the original code. We create a subclass of date and override the today() method.
-        # This allows us to control the current date for testing purposes.
         class FakeDate(date):
             @classmethod
             def today(cls):
