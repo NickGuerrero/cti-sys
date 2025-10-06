@@ -83,7 +83,7 @@ class TestAttendanceEntry:
         ("WRONG_KEY", 401), # invalid key
         (None, 403), # missing key
     ])
-    def test_api_key_cases(self, client, monkeypatch, token, expected_status):
+    def test_api_key_cases(self, client, monkeypatch, mock_postgresql_db, token, expected_status):
         """ Test request with valid, invalid, and missing API keys """
         monkeypatch.setattr(
             "src.students.attendance_entry.service.load_email_whitelist",

@@ -71,14 +71,6 @@ def mock_postgresql_db():
     yield db
     app.dependency_overrides.pop(make_session)
 
-@pytest.fixture(autouse=True, scope="function")
-def global_mock_db_session(request, mock_postgresql_db):
-    """Fixture to globally mock or use real DB session based on test"""
-    if "integration" in request.keywords:
-        yield # Use real DB session for integration tests
-    else:
-        yield # Use the mock_postgresql_db fixture
-
 @pytest.fixture(scope="session", autouse=True)
 def global_canvas_api_url_override():
     """Fixture to override the Canvas URL in favor of the test environment"""
