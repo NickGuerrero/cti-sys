@@ -108,7 +108,7 @@ class TestAttendanceEntry:
         if expected_status == 401:
             assert "Invalid or missing API key" in resp.text
 
-    def test_not_in_allow_list(self, client, monkeypatch, auth_headers):
+    def test_not_in_allow_list(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """ Test request with email not in allow-list of emails from google sheet """
         monkeypatch.setattr(
             "src.students.attendance_entry.service.load_email_whitelist",
@@ -129,7 +129,7 @@ class TestAttendanceEntry:
         assert resp.status_code == 403
         assert "Email not authorized" in resp.text
 
-    def test_end_before_start(self, client, monkeypatch, auth_headers):
+    def test_end_before_start(self, client, monkeypatch, mock_postgresql_db, auth_headers):
         """ Test request where session end time is before start time """
         monkeypatch.setattr(
             "src.students.attendance_entry.service.load_email_whitelist",
