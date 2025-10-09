@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Apart from constants or required env vars, you should verify the values exist at runtime
     app_env: str = Field(validation_alias="APP_ENV", pattern=r'^(development|production)$', default="development")
     # TODO: Convert this into a general purpose API key
-    attendance_api_key: Optional[str] = Field(default=None, validation_alias="ATTENDANCE_API_KEY")
+    cti_sys_admin_key: Optional[str] = Field(default=None, validation_alias="CTI_SYS_ADMIN_KEY")
 
     # Database Connection Strings, required for Database operations
     # TODO: Validate these as connection strings, with user, pass, db, and host

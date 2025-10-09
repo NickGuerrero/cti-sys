@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.database.postgres.core import make_session
 from src.students.accelerate.process_attendance.service import process_accelerate_metrics
+from src.utils.exceptions import handle_db_exceptions 
 
 router = APIRouter()
 
@@ -20,6 +21,5 @@ def process_accelerate_attendance(db: Session = Depends(make_session)) -> Dict[s
     # return process_accelerate_metrics(db)
     try:
         return process_accelerate_metrics(db)
-    except Exception as exc:        
-        db.rollback()            
-        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
+    except Exception as e:
+        handle_db_exceptions(db, e)
