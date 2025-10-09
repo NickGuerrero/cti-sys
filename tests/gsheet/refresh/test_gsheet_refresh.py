@@ -17,7 +17,7 @@ client = TestClient(app)
 class TestGSheet:
     @pytest.mark.integration
     @pytest.mark.gsheet
-    def testRefreshMain(self, monkeypatch):
+    def testRefreshMain(self, monkeypatch, auth_headers):
         """
         Check that the gspread integration is working, not that it works correctly
         Note that verifying that the sheets match requires type-alignment, which is
@@ -25,7 +25,8 @@ class TestGSheet:
         """
         # Note that TEST_SHEET_KEY should only ever be called and used in testing
         monkeypatch.setenv("ROSTER_SHEET_KEY", environ.get("TEST_SHEET_KEY"))
-        response = client.post("/api/gsheet/refresh/main")
+        response = client.post("/api/gsheet/refresh/main", headers=auth_headers)
+        assert response.status_code == 201
 
         # Check that at least the correct number of rows were written
         gc = service.create_credentials()
