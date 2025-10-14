@@ -21,13 +21,21 @@ async def lifespan(app: FastAPI):
     await close_mongo()
 
 if settings.app_env == "production":
-    # In production: disable Swagger UI and /docs endpoints
+    # Production: disable docs
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-else:
-    # In development: keep docs enabled
-    app = FastAPI(lifespan=lifespan)
+    
+    # Message for root and /docs endpoint in production
+    @app.get("/", tags=["Health"])
+    def read_root():
+        return {"message": "API running in production mode"}
 
-if settings.app_env != "production":
+    @app.get("/docs", include_in_schema=False)
+    def docs_disabled():
+        return {"message": "API documentation is not available in this environment."}
+else:
+    # Development: enable docs and health endpoints
+    app = FastAPI(lifespan=lifespan)
+    
     @app.get("/", tags=["Health"])
     def read_root():
         return {"message": "cti-sys v1.0.0"}
