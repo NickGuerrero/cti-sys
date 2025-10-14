@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
@@ -10,6 +10,7 @@ from src.database.mongo.core import close_mongo, get_mongo, init_mongo, ping_mon
 from src.database.postgres.core import make_session
 from src.database.postgres.models import Student
 from src.students.models import StudentDTO
+from src.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,39 +20,60 @@ async def lifespan(app: FastAPI):
     # on-shutdown operations
     await close_mongo()
 
-app = FastAPI(lifespan=lifespan)
-
-@app.get("/")
-def read_root():
-    return {"message": "cti-sys v1.0.0"}
-
-@app.get("/test-connection")
-def confirm_conn(db: Session = Depends(make_session)):
-    try:
-        result = db.execute(text("SELECT 1"))
-        if result.scalar() == 1:
-            return {"message": "Database connection succeeded"}
-    except SQLAlchemyError:
-        raise HTTPException(status_code=500, detail="Database Inaccessible")
-
-@app.get("/test-db")
-def database_test(db: Session = Depends(make_session)):
-    try:
-        exists = db.query(Student).first()
-        if exists:
-            # return StudentSchema.model_validate(Student)
-            return StudentDTO.model_validate(exists)
-        else:
-            return {"message": "Database Accessible, but contains no data"}
-    except SQLAlchemyError:
-        raise HTTPException(status_code=500, detail="Database Inaccessible")
+if settings.app_env == "production":
+    # Production: disable docs
+    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     
-@app.get("/test-mongo")
-def mongo_test(db: Database = Depends(get_mongo)):
-    try:
-        ping_mongo(db.client)
-        return {"message": "Successfully accessed MongoDB"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error accessing MongoDB: {str(e)}")
+    # Message for root and /docs endpoint in production
+    @app.get("/", tags=["Health"])
+    def read_root():
+        return {"message": "API running in production mode"}
 
+    @app.get("/docs", include_in_schema=False)
+    def docs_disabled():
+        return {"message": "API documentation is not available in this environment."}
+else:
+    # Development: enable docs and health endpoints
+    app = FastAPI(lifespan=lifespan)
+    
+    @app.get("/", tags=["Health"])
+    def read_root():
+        return {"message": "cti-sys v1.0.0"}
+
+    @app.get("/test-connection", tags=["Health"])
+    def confirm_conn(db: Session = Depends(make_session)):
+        try:
+            result = db.execute(text("SELECT 1"))
+            if result.scalar() == 1:
+                return {"message": "Database connection succeeded"}
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database inaccessible",
+            )
+
+    @app.get("/test-db", tags=["Health"])
+    def database_test(db: Session = Depends(make_session)):
+        try:
+            exists = db.query(Student).first()
+            if exists:
+                return StudentDTO.model_validate(exists)
+            return {"message": "Database accessible, but contains no data"}
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database inaccessible",
+            )
+
+    @app.get("/test-mongo", tags=["Health"])
+    def mongo_test(db: Database = Depends(get_mongo)):
+        try:
+            ping_mongo(db.client)
+            return {"message": "Successfully accessed MongoDB"}
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error accessing MongoDB: {str(e)}",
+            )
+        
 app.include_router(api_router, prefix="/api")

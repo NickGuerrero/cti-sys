@@ -13,7 +13,7 @@ client = TestClient(app)
 class TestCanvasExport:
     @pytest.mark.integration
     @pytest.mark.canvas
-    def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase):
+    def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase, auth_headers):
         """
         Integration test validating a successful external API interaction and handling.
 
@@ -80,7 +80,7 @@ class TestCanvasExport:
         assert insert_result.acknowledged and len(insert_result.inserted_ids) == len(applications)
 
         # 2. Initiate endpoint request and validate success
-        response = client.post("/api/applications/canvas-export")
+        response = client.post("/api/applications/canvas-export", headers=auth_headers)
         assert response.status_code == 200
         import_data = CanvasExportResponse(**response.json())
 

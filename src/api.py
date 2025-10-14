@@ -17,21 +17,24 @@ api_router = APIRouter()
 api_router.include_router(
     applications_router,
     prefix="/applications",
-    tags=["Applications"]
+    tags=["Applications"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/applications/master-roster...
 api_router.include_router(
     applications_add_to_master_roster_router,
     prefix="/applications/add-to-master-roster",
-    tags=["Applications"]
+    tags=["Applications"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/applications/canvas-export
 api_router.include_router(
     canvas_export_router,
     prefix="/applications/canvas-export",
-    tags=["Applications"]
+    tags=["Applications"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/alternate-emails
@@ -78,5 +81,6 @@ api_router.include_router(
 api_router.include_router(
     gsheet_refresh_router,
     prefix="/gsheet/refresh",
-    tags=["Students"]
+    tags=["Students"],
+    dependencies=[Depends(verify_api_key)]
 )
