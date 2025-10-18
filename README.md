@@ -22,7 +22,7 @@ This project is primarily being developed internally and for internal use. Many 
 ### Build Instructions
 
 #### Database Set-Up
-You'll need both a PostgreSQL Database and a MongoDB Database. You'll also need admin permissions to set-up the tables/collections. Make sure you have the following connection strings set (either through a env file, Heroku's conifg vars, or an environment variable). Additionally, if you are building from scratch, make sure to install the requirements.txt, since you'll need SQLAlchemy and Pymongo to run the initialization scripts.
+You'll need both a PostgreSQL Database and a MongoDB Database. You'll also need admin permissions to set-up the tables/collections. Make sure you have the following connection strings set (either through a env file, Heroku's conifg vars, or an environment variable). Additionally, if you are building from scratch, make sure to install the uv dependencies, since you'll need SQLAlchemy and Pymongo to run the initialization scripts.
 
 If you are part of the development team, you should have received a .env file with credentials for the development databases.
 ```
@@ -45,7 +45,7 @@ Currently, the database is automatically created on deploy, along with collectio
 Everything should be handled by the Procfile, so look there if you need to modify runtime.
 
 #### Local Deployment
-1. Create a virtual environment and install the requirements.txt
+1. Create a virtual environment and install the uv.lock dependencies
 2. Make sure the environment variables are set
 3. You can run the application either through FastAPI directly, or with Gunicorn (Not Windows)
 ```
