@@ -12,12 +12,10 @@ from src.database.postgres.core import engine as CONN
 from src.database.postgres.core import SessionFactory
 import src.gsheet.refresh.service as service
 
-client = TestClient(app)
-
 class TestGSheet:
     @pytest.mark.integration
     @pytest.mark.gsheet
-    def testRefreshMain(self, monkeypatch, auth_headers):
+    def testRefreshMain(self, monkeypatch, client):
         """
         Check that the gspread integration is working, not that it works correctly
         Note that verifying that the sheets match requires type-alignment, which is
@@ -25,7 +23,7 @@ class TestGSheet:
         """
         # Note that TEST_SHEET_KEY should only ever be called and used in testing
         monkeypatch.setenv("ROSTER_SHEET_KEY", environ.get("TEST_SHEET_KEY"))
-        response = client.post("/api/gsheet/refresh/main", headers=auth_headers)
+        response = client.post("/api/gsheet/refresh/main")
         assert response.status_code == 201
 
         # Check that at least the correct number of rows were written

@@ -36,7 +36,6 @@ class TestProcessAttendanceLog:
         expected_failed,
         monkeypatch,
         mock_postgresql_db,
-        auth_headers,
     ):
         """
         Test processing of a single attendance row under two conditions:
@@ -74,7 +73,7 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
         assert response.status_code == 200
 
         # Verify the JSON response against our expected success/failure counts.
@@ -88,7 +87,7 @@ class TestProcessAttendanceLog:
         if expected_failed:
             mock_postgresql_db.rollback.assert_called_once()
 
-    def test_multiple_attendance_rows_partial_fail(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_multiple_attendance_rows_partial_fail(self, client, monkeypatch, mock_postgresql_db):
         """
         Test a scenario with multiple attendance rows in the database:
         - 3 valid CSV links, each should process successfully.
@@ -160,7 +159,7 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
         assert response.status_code == 200
         resp_json = response.json()
 
@@ -170,7 +169,7 @@ class TestProcessAttendanceLog:
         assert mock_postgresql_db.commit.call_count == 3
         assert mock_postgresql_db.rollback.call_count == 1
 
-    def test_empty_csv_fails(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_empty_csv_fails(self, client, monkeypatch, mock_postgresql_db):
         """
         Test that an empty CSV string leads to a failure.
 
@@ -200,7 +199,7 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
         assert response.status_code == 200
         resp_json = response.json()
         # We expect zero processed, one failure.
@@ -208,7 +207,7 @@ class TestProcessAttendanceLog:
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_requests_error(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_requests_error(self, client, monkeypatch, mock_postgresql_db):
         """
         Test that any HTTP-related error (e.g., 403) when fetching CSV
         results in a failure of that sheet.
@@ -236,14 +235,14 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
         assert response.status_code == 200
         resp_json = response.json()
         assert resp_json["sheets_processed"] == 0
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_csv_header_only(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_csv_header_only(self, client, monkeypatch, mock_postgresql_db):
         """
         Test that a CSV containing only headers (no data rows) is successfully processed.
 
@@ -266,7 +265,7 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
         assert response.status_code == 200
         resp_json = response.json()
         assert resp_json["sheets_processed"] == 1
@@ -284,7 +283,7 @@ class TestProcessAttendanceLog:
         with pytest.raises(ValueError, match="Unable to parse doc ID from:"):
             convert_google_sheet_link_to_csv(invalid_link)
 
-    def test_unknown_email_goes_to_missing_attendance(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_unknown_email_goes_to_missing_attendance(self, client, monkeypatch, mock_postgresql_db):
         """
         Test that when the email in the CSV is not found in the database,
         the row is recorded in missing_attendance and the sheet is still considered processed.
@@ -317,7 +316,7 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
 
         assert response.status_code == 200
         resp_json = response.json()
@@ -336,7 +335,7 @@ class TestProcessAttendanceLog:
         assert missing_obj.session_id == 555
         assert missing_obj.name == "Unknown Only"
 
-    def test_mixed_known_and_unknown_email(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_mixed_known_and_unknown_email(self, client, monkeypatch, mock_postgresql_db):
         """
         Test that a CSV row with a known user is not inserted into missing_attendance,
         while a row with an unknown user is inserted.
@@ -381,7 +380,7 @@ class TestProcessAttendanceLog:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
 
         assert response.status_code == 200
         resp_json = response.json()
@@ -401,7 +400,7 @@ class TestProcessAttendanceLog:
         assert missing_obj.session_id == 999
         assert missing_obj.name == "Unknown User"
 
-    def test_student_count_multiple_students(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_student_count_multiple_students(self, client, monkeypatch, mock_postgresql_db):
         """
         Ensure that student_count reflects the number of rows in the CSV.
         """
@@ -433,7 +432,7 @@ class TestProcessAttendanceLog:
 
         monkeypatch.setattr("requests.get", mock_requests_get)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
 
         assert response.status_code == 200
         resp_json = response.json()
@@ -445,7 +444,7 @@ class TestProcessAttendanceLog:
         # student_count should equal number of CSV rows (3)
         assert attendance_row.student_count == 3
 
-    def test_full_attendance_true(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_full_attendance_true(self, client, monkeypatch, mock_postgresql_db):
         """
         A student should have full_attendance=True if both the first and last slides are non-empty.
         """
@@ -480,7 +479,7 @@ class TestProcessAttendanceLog:
         mock_attendance_obj = []
         mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
 
         assert response.status_code == 200
         resp_json = response.json()
@@ -489,7 +488,7 @@ class TestProcessAttendanceLog:
         assert len(mock_attendance_obj) == 1
         assert mock_attendance_obj[0].full_attendance is True
 
-    def test_full_attendance_false(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_full_attendance_false(self, client, monkeypatch, mock_postgresql_db):
         """
         A student should have full_attendance=False if either the first or last slide is blank.
         """
@@ -524,7 +523,7 @@ class TestProcessAttendanceLog:
         mock_attendance_obj = []
         mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
 
-        response = client.post("/api/students/process-attendance-log", headers=auth_headers)
+        response = client.post("/api/students/process-attendance-log")
 
         assert response.status_code == 200
         resp_json = response.json()

@@ -11,14 +11,13 @@ from src.students.attendance_entry.router import router as student_attendance_en
 from src.gsheet.refresh.router import router as gsheet_refresh_router
 from src.utils.authorization import verify_api_key
 
-api_router = APIRouter()
+api_router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 # /api/applications/...
 api_router.include_router(
     applications_router,
     prefix="/applications",
     tags=["Applications"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/applications/master-roster...
@@ -26,7 +25,6 @@ api_router.include_router(
     applications_add_to_master_roster_router,
     prefix="/applications/add-to-master-roster",
     tags=["Applications"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/applications/canvas-export
@@ -34,7 +32,6 @@ api_router.include_router(
     canvas_export_router,
     prefix="/applications/canvas-export",
     tags=["Applications"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/alternate-emails
@@ -42,7 +39,6 @@ api_router.include_router(
     student_alternate_emails_router,
     prefix="/students/alternate-emails",
     tags=["Students"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/process-attendance-log
@@ -50,7 +46,6 @@ api_router.include_router(
     student_attendance_log_router,
     prefix="/students/process-attendance-log",
     tags=["Students"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/accelerate/process-attendance
@@ -58,7 +53,6 @@ api_router.include_router(
     accelerate_attendance_record_router,
     prefix="/students/accelerate/process-attendance",
     tags=["Accelerate"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/recover-attendance
@@ -66,7 +60,6 @@ api_router.include_router(
     student_recover_attendance_router,
     prefix="/students/recover-attendance",
     tags=["Students"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/students/create-attendance-entry
@@ -74,7 +67,6 @@ api_router.include_router(
     student_attendance_entry_router,
     prefix="/students/create-attendance-entry",
     tags=["Students"],
-    dependencies=[Depends(verify_api_key)]
 )
 
 # /api/gsheet/refresh/...
@@ -82,5 +74,4 @@ api_router.include_router(
     gsheet_refresh_router,
     prefix="/gsheet/refresh",
     tags=["Students"],
-    dependencies=[Depends(verify_api_key)]
 )
