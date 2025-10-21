@@ -6,7 +6,7 @@ from src.config import settings
 from src.students.missing_students import service
 
 class TestRecoverAttendance:
-    def test_no_missing_records(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_no_missing_records(self, client, monkeypatch, mock_postgresql_db):
         """
         Test the case where there are no MissingAttendance records.
         """
@@ -18,14 +18,14 @@ class TestRecoverAttendance:
         # Stub process_matches to return an empty list
         monkeypatch.setattr(service, "process_matches", lambda db_session, matches: [])
 
-        response = client.post("/api/students/recover-attendance", headers=auth_headers)
+        response = client.post("/api/students/recover-attendance")
         assert response.status_code == 200
         assert response.json() == {"status": 200, "moved": 0}
 
         mock_postgresql_db.commit.assert_not_called()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_move_single_record(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_move_single_record(self, client, env, monkeypatch, mock_postgresql_db):
         """
         Test the case where there is one match for MissingAttendance.
         The endpoint should return moved=1, and in development env rows 
@@ -52,7 +52,7 @@ class TestRecoverAttendance:
         monkeypatch.setattr(service, "process_matches", fake_process)
         mock_postgresql_db.commit = MagicMock()
 
-        response = client.post("/api/students/recover-attendance", headers=auth_headers)
+        response = client.post("/api/students/recover-attendance")
         assert response.status_code == 200
 
         data = response.json()
@@ -66,7 +66,7 @@ class TestRecoverAttendance:
         mock_postgresql_db.commit.assert_called_once()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_move_multiple_records(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_move_multiple_records(self, client, env, monkeypatch, mock_postgresql_db):
         """
         Test the case where there are multiple matches for MissingAttendance.
         The endpoint should return moved=2, and in development env rows 
@@ -103,7 +103,7 @@ class TestRecoverAttendance:
         monkeypatch.setattr(service, "process_matches", fake_process)
         mock_postgresql_db.commit = MagicMock()
 
-        response = client.post("/api/students/recover-attendance", headers=auth_headers)
+        response = client.post("/api/students/recover-attendance")
         assert response.status_code == 200
 
         data = response.json()
@@ -117,7 +117,7 @@ class TestRecoverAttendance:
         mock_postgresql_db.commit.assert_called_once()
 
     @pytest.mark.parametrize("env", ["production", "development"])
-    def test_skip_existing_attendance(self, client, env, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_skip_existing_attendance(self, client, env, monkeypatch, mock_postgresql_db):
         """
         Test the case where a MissingAttendance record exists, but a corresponding
         StudentAttendance already exists for the same cti_id and session_id.
@@ -141,7 +141,7 @@ class TestRecoverAttendance:
         monkeypatch.setattr(service, "process_matches", lambda db_session, matches: [])
         mock_postgresql_db.commit = MagicMock()
 
-        response = client.post("/api/students/recover-attendance", headers=auth_headers)
+        response = client.post("/api/students/recover-attendance")
         assert response.status_code == 200
 
         data = response.json()
@@ -155,14 +155,14 @@ class TestRecoverAttendance:
 
         mock_postgresql_db.commit.assert_called_once()
 
-    def test_database_error_raises_500(self, client, mock_postgresql_db, auth_headers):
+    def test_database_error_raises_500(self, client, mock_postgresql_db):
         """
         Simulate a database error during the transaction.
         """
         mock_postgresql_db.execute.side_effect = SQLAlchemyError("fail")
         mock_postgresql_db.rollback = MagicMock()
 
-        response = client.post("/api/students/recover-attendance", headers=auth_headers)
+        response = client.post("/api/students/recover-attendance")
         assert response.status_code == 500
 
         mock_postgresql_db.rollback.assert_called_once()

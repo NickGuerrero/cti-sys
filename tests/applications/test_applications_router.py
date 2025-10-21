@@ -10,10 +10,8 @@ from src.applications.models import ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
 from src.main import app
 
-client = TestClient(app)
-
 class TestCreateApplication:
-    def test_success_min_required_fields(self, mock_mongo_db: MockMongoDatabase):
+    def test_success_min_required_fields(self, mock_mongo_db: MockMongoDatabase, client):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -23,7 +21,7 @@ class TestCreateApplication:
         assert response.status_code == 201
         assert bson.ObjectId.is_valid(response.json()["_id"])
 
-    def test_success_with_extra_fields(self, mock_mongo_db: MockMongoDatabase):
+    def test_success_with_extra_fields(self, mock_mongo_db: MockMongoDatabase, client):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -37,7 +35,7 @@ class TestCreateApplication:
         assert response.json()["cohort"]
         assert response.json()["graduating_year"] == 2024
 
-    def test_failure_missing_required_last_name(self, mock_mongo_db: MockMongoDatabase):
+    def test_failure_missing_required_last_name(self, mock_mongo_db: MockMongoDatabase, client):
         response = client.post("/api/applications", json={
             "fname": "First",
             # missing lname
@@ -50,7 +48,7 @@ class TestCreateApplication:
         detail = response.json()["detail"][0]
         assert detail["type"] == "missing"
 
-    def test_failure_invalid_email(self, mock_mongo_db: MockMongoDatabase):
+    def test_failure_invalid_email(self, mock_mongo_db: MockMongoDatabase, client):
         response = client.post("/api/applications", json={
             "fname": "First",
             "lname": "Last",
@@ -64,7 +62,7 @@ class TestCreateApplication:
         assert detail["type"] == "value_error"
         assert "not a valid email address" in detail["msg"]
 
-    def test_failure_duplicate_email_key(self, mock_mongo_db: MockMongoDatabase):
+    def test_failure_duplicate_email_key(self, mock_mongo_db: MockMongoDatabase, client):
         # pydantic model used to validate test data before inserting as mongomock does not support json schema validation
         app = ApplicationModel(
             fname="First",
@@ -90,7 +88,7 @@ class TestCreateApplication:
         assert "Duplicate index key" in detail
 
     @pytest.mark.integration
-    def test_application_persistence(self, real_mongo_db: MongoDatabase):
+    def test_application_persistence(self, real_mongo_db: MongoDatabase, client):
         """Integration test validating that a document can be inserted and found
         if the fields follow the collection schema
         """
@@ -111,7 +109,7 @@ class TestCreateApplication:
         assert prev_count + 1 == app_collection.count_documents({})
     
     @pytest.mark.integration
-    def test_application_schema_rejects_invalid_insert(self, real_mongo_db: MongoDatabase):
+    def test_application_schema_rejects_invalid_insert(self, real_mongo_db: MongoDatabase, client):
         """Integration test validating that a document will not be inserted
         if it does not follow the collection json validation schema.
         

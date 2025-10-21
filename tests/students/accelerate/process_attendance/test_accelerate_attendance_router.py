@@ -4,7 +4,7 @@ from src.database.postgres.models import Accelerate
 from src.students.accelerate.process_attendance import service as svc
 
 class TestProcessAccelerateAttendance:
-    def test_process_attendance_success(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_process_attendance_success(self, client, monkeypatch, mock_postgresql_db):
         """
         Simulate a case where two active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written, and the transaction is committed.
@@ -36,7 +36,7 @@ class TestProcessAccelerateAttendance:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
+        res = client.post("/api/students/accelerate/process-attendance")
 
         assert res.status_code == 200
         assert res.json() == {"status": 200, "records_updated": 2}
@@ -46,7 +46,7 @@ class TestProcessAccelerateAttendance:
         assert acc_2.participation_score == 0.5
 
 
-    def test_no_active_students(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_no_active_students(self, client, monkeypatch, mock_postgresql_db):
         """
         Simulate a case where no active students are returned from the database.
             - Two active Accelerate rows are returned, metrics are written,
@@ -60,14 +60,14 @@ class TestProcessAccelerateAttendance:
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
+        res = client.post("/api/students/accelerate/process-attendance")
         assert res.status_code == 200
         assert res.json() == {"status": 200, "records_updated": 0}
         mock_postgresql_db.commit.assert_called_once()
         mock_postgresql_db.rollback.assert_not_called()
 
 
-    def test_database_error_triggers_rollback(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_database_error_triggers_rollback(self, client, monkeypatch, mock_postgresql_db):
         """
         Simulate a database error during the transaction.
             - return HTTP-500
@@ -84,7 +84,7 @@ class TestProcessAccelerateAttendance:
         mock_postgresql_db.rollback.return_value = None
 
         # Turn server exceptions into HTTP-500 responses.
-        res = client.post("/api/students/accelerate/process-attendance", headers=auth_headers)
+        res = client.post("/api/students/accelerate/process-attendance")
 
         assert res.status_code == 500
         mock_postgresql_db.rollback.assert_called_once()

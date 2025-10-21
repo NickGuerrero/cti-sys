@@ -18,16 +18,17 @@ def override_cti_admin_key():
     """Ensure tests always use a fixed admin API key"""
     settings.cti_sys_admin_key = "TEST_KEY"
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def auth_headers():
     """Reusable Authorization header for API requests"""
     return {"Authorization": "Bearer TEST_KEY"}
 
 @pytest.fixture(scope="session")
-def client():
-    """Shared FastAPI test client"""
-    return TestClient(app)
-
+def client(auth_headers):
+    """Shared FastAPI test client with auth headers included"""
+    client = TestClient(app)
+    client.headers.update(auth_headers)
+    return client
 
 @pytest.fixture(scope="function")
 def mock_mongo_db():

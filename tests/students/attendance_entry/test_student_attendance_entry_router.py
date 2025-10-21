@@ -42,7 +42,6 @@ class TestAttendanceEntry:
         end_time,
         monkeypatch,
         mock_postgresql_db,
-        auth_headers,
     ):
         """ Test successful creation of attendance entry """
 
@@ -66,7 +65,7 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == 200
@@ -101,14 +100,20 @@ class TestAttendanceEntry:
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
 
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=headers)
+        orig_headers = client.headers.copy()
+        if token is None:
+            client.headers.pop("Authorization", None)
+        else:
+            client.headers["Authorization"] = f"Bearer {token}"
+
+        resp = client.post("/api/students/create-attendance-entry", json=payload)
+        client.headers = orig_headers
 
         assert resp.status_code == expected_status
         if expected_status == 401:
             assert "Invalid or missing API key" in resp.text
 
-    def test_not_in_allow_list(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_not_in_allow_list(self, client, monkeypatch, mock_postgresql_db):
         """ Test request with email not in allow-list of emails from google sheet """
         monkeypatch.setattr(
             "src.students.attendance_entry.service.load_email_whitelist",
@@ -125,11 +130,11 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload)
         assert resp.status_code == 403
         assert "Email not authorized" in resp.text
 
-    def test_end_before_start(self, client, monkeypatch, mock_postgresql_db, auth_headers):
+    def test_end_before_start(self, client, monkeypatch, mock_postgresql_db):
         """ Test request where session end time is before start time """
         monkeypatch.setattr(
             "src.students.attendance_entry.service.load_email_whitelist",
@@ -146,6 +151,6 @@ class TestAttendanceEntry:
             "link_type": "PEARDECK",
             "link": "https://docs.google.com/spreadsheets/d/ABC/edit?gid=0#gid=0",
         }
-        resp = client.post("/api/students/create-attendance-entry", json=payload, headers=auth_headers)
+        resp = client.post("/api/students/create-attendance-entry", json=payload)
         assert resp.status_code == 400
         assert "must be after" in resp.text

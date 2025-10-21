@@ -8,12 +8,10 @@ from src.applications.models import ApplicationModel
 from src.config import APPLICATIONS_COLLECTION
 from src.main import app
 
-client = TestClient(app)
-
 class TestCanvasExport:
     @pytest.mark.integration
     @pytest.mark.canvas
-    def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase):
+    def test_add_applicants_to_canvas(self, real_mongo_db: MongoDatabase, client):
         """
         Integration test validating a successful external API interaction and handling.
 
