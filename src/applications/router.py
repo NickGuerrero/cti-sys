@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from mongomock import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError
 from pymongo.database import Database
 
 from src.applications.models import ApplicationModel

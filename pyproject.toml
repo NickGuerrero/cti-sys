@@ -1,0 +1,32 @@
+[project]
+name = "cti-sys"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "email-validator==2.2.0",
+    "fastapi==0.115.6",
+    "gspread-dataframe==4.0.0",
+    "gspread-formatting==1.2.1",
+    "gunicorn==23.0.0",
+    "httpx==0.28.1",
+    "pandas==2.2.3",
+    "psycopg==3.2.3",
+    "psycopg-binary==3.2.4",
+    "psycopg-pool==3.2.4",
+    "pydantic-settings==2.8.1",
+    "pymongo==4.10.1",
+    "requests==2.32.3",
+    "sendgrid==6.12.4",
+    "sqlalchemy==2.0.36",
+    "urllib3==2.4.0",
+    "uvicorn==0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "alembic==1.14.0",
+    "mongomock==4.3.0",
+    "fastapi-cli==0.0.7",
+    "pytest==8.3.4",
+    "pytest-cov==4.1.0",
+]
