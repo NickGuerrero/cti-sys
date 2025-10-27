@@ -7,6 +7,7 @@ This folder is for storing script written to communicate between the server/data
 * Contains Menu logic for accessing endpoints from target Google Sheet
 
 ## Set-Up
+
 ### Environment Vars
 The following values are required as Script Properties (to be fetch by PropertyService)
 * BASE_SERVER_URL: URL where the server is located. Do not include the target endpoint 
@@ -31,4 +32,7 @@ Testing is limited; these scripts should be verified manually.
 * Mocking event objects is difficult without a dedicated library
 * A new test env would need to be added to the repository
 * The Google Apps Script runtime may differ from regular node environment
-TODO: It's possible to test, if anyone is interested in fixing this, please introduce the issue.
+
+# TODOs
+* It's possible to test, if anyone is interested in fixing this, please introduce the issue.
+* This code could use improvements from someone with more JS experience. Would appreciate more clarity and succintness.
