@@ -1,0 +1,21 @@
+# This ignore file is for the Heroku deployment, prevents unneeded files
+# See more here: https://devcenter.heroku.com/articles/slug-compiler
+# Note that tests need to be included for Heroku CI, if we end up using it
+
+# IMPORTANT: Heroku pulls directly from the repo
+# Anything already ignored by .gitignore does not need to be here
+
+# Project folders
+/tests
+/migrations
+/docs
+/gas_logic
+/.github
+
+# Non-essential file types
+*.md
+
+
+# Non-essential specific files
+LICENSE.txt
+alembic.ini
