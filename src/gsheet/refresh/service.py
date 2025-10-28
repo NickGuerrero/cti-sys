@@ -106,12 +106,11 @@ def fetch_roster(eng: Engine):
     # This only pads rows, since gsheet writes only write over the existing sheet
     # Column padding is not common, should not be required often 
     empty_rows = max(settings.gsheet_write_rows_max - roster_frame.shape[0], 0)
-    empty_data = {col: [pd.NA for row in range(empty_rows)] for col in roster_frame.columns}
-    padding = pd.DataFrame(empty_data)
-    pd.concat([roster_frame, padding], ignore_index=True)
+    empty_data = {col: [pandas.NA for row in range(empty_rows)] for col in roster_frame.columns}
+    padding = pandas.DataFrame(empty_data)
+    pandas.concat([roster_frame, padding])
 
     # Dataframe needs to be modified to be copied to Google Sheet. Mostly allowing serialization.
-    pass # Pad dataframe to 998 rows
     roster_frame = roster_frame.astype({"Birthday": str}) # Date objects not allowed
     roster_frame['Ethnicities'] = roster_frame['Ethnicities'].apply(
             lambda x: ', '.join(x) if isinstance(x, list) else (x if pandas.notnull(x) else "")

@@ -12,12 +12,9 @@ class TestAttendanceEntry:
     def test_gsheet_whitelist_fetch(self):
         """ Test whitelist is fetch correctly, uses Test Worksheet """
         # Create set of emails for testing sheet fetching functionality
-        email_padding = [""] * 50 # Clear any lingering emails
-        email_write = [
-            "nicguerrero@csumb.edu", # Nick's work email, used for testing after set-up
-            "example2@email.com",
-            "example3@email.com"
-        ].extend(email_padding)
+        # I'm adding my work email to make testing easier post-test calls
+        email_write = ["nicguerrero@csumb.edu", "example2@email.com", "example3@email.com"]
+        email_write.extend([""] * 50) # Clear any lingering emails from sheet
         # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
         df = pd.DataFrame({
             "email": email_write
