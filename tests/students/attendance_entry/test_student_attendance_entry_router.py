@@ -11,9 +11,16 @@ class TestAttendanceEntry:
     @pytest.mark.gsheet
     def test_gsheet_whitelist_fetch(self):
         """ Test whitelist is fetch correctly, uses Test Worksheet """
+        # Create set of emails for testing sheet fetching functionality
+        email_padding = [""] * 50 # Clear any lingering emails
+        email_write = [
+            "nicguerrero@csumb.edu", # Nick's work email, used for testing after set-up
+            "example2@email.com",
+            "example3@email.com"
+        ].extend(email_padding)
         # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
         df = pd.DataFrame({
-            "email": ["example1@email.com", "example2@email.com", "example3@email.com"]
+            "email": email_write
         })
         gc = create_credentials()
         sh = gc.open_by_key(settings.test_sheet_key)
@@ -22,7 +29,7 @@ class TestAttendanceEntry:
         # Verify email list is fetched correctly
         email_cache = entry_service.load_email_whitelist(settings.test_sheet_key, settings.sa_whitelist)
         assert len(email_cache) == 3
-        assert "example1@email.com" in email_cache
+        assert "nicguerrero@csumb.edu" in email_cache
         assert "example2@email.com" in email_cache
         assert "example3@email.com" in email_cache
 

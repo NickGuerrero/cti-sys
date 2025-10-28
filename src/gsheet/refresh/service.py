@@ -63,6 +63,10 @@ def fetch_roster(eng: Engine):
     Fetch roster from associated Accelerate tables, and return it as a pd dataframe
     @param eng: A SQLAlchemy Engine object that connects to the database
 
+    Settings configuration (config.py)
+    gsheet_write_rows_max: The maximum numbers of rows that can be written to gsheet
+    (WARNING: Do not leave this unbounded. Keep max sheet size in mind when adjusting)
+
     Notes:
     - pandas runs the query, so an Engine object is needed. Allowable for a Select query
     - The dataframe headers will match the sheet headers
@@ -94,11 +98,20 @@ def fetch_roster(eng: Engine):
         .join(AccountabilityGroup, Accelerate.accountability_group == AccountabilityGroup.ag_id, isouter=True)
         .where(StudentEmail.is_primary == True)
         .order_by(Student.cti_id.asc())
-        .limit(998) # No more than 999 rows on 1 sheet without issues
+        .limit(settings.gsheet_write_rows_max) # No more than 999 rows on 1 sheet without issues
     )
     roster_frame = pandas.read_sql(roster_query, eng)
 
+    # Create an empty dataframe to pad the resultant dataframe
+    # This only pads rows, since gsheet writes only write over the existing sheet
+    # Column padding is not common, should not be required often 
+    empty_rows = max(settings.gsheet_write_rows_max - roster_frame.shape[0], 0)
+    empty_data = {col: [pd.NA for row in range(empty_rows)] for col in roster_frame.columns}
+    padding = pd.DataFrame(empty_data)
+    pd.concat([roster_frame, padding], ignore_index=True)
+
     # Dataframe needs to be modified to be copied to Google Sheet. Mostly allowing serialization.
+    pass # Pad dataframe to 998 rows
     roster_frame = roster_frame.astype({"Birthday": str}) # Date objects not allowed
     roster_frame['Ethnicities'] = roster_frame['Ethnicities'].apply(
             lambda x: ', '.join(x) if isinstance(x, list) else (x if pandas.notnull(x) else "")
