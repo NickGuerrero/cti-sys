@@ -39,6 +39,18 @@ class TestGSheet:
     
     @pytest.mark.integration
     @pytest.mark.gsheet
+    def testRefreshAttendance(self, monkeypatch, client):
+        """
+        Check the Attendance endpoint is working
+        Used alonsgide above to test printing to GSheet
+        """
+        # Note that TEST_SHEET_KEY should only ever be called and used in testing
+        monkeypatch.setenv("ROSTER_SHEET_KEY", settings.test_sheet_key)
+        response = client.post("/api/gsheet/refresh/attendance")
+        assert response.status_code == 201
+    
+    @pytest.mark.integration
+    @pytest.mark.gsheet
     def testPandasDataframeCreation(self):
         """
         Check that pandas dataframe meets certain sheet requirements

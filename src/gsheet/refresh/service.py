@@ -7,7 +7,6 @@ from src.database.postgres.models import Student, Accelerate, StudentEmail, Canv
 # import mongo objects here
 import gspread
 import pandas
-from os import environ
 from src.config import settings
 
 # TODO: Move this into a general utilities file
