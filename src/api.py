@@ -8,6 +8,8 @@ from src.students.attendance_log.router import router as student_attendance_log_
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
 from src.students.missing_students.router import router as student_recover_attendance_router
 from src.students.attendance_entry.router import router as student_attendance_entry_router
+from src.students.withdrawal_processing.router import router as student_withdrawal_router
+
 from src.gsheet.refresh.router import router as gsheet_refresh_router
 from src.utils.authorization import verify_api_key
 
@@ -66,6 +68,13 @@ api_router.include_router(
 api_router.include_router(
     student_attendance_entry_router,
     prefix="/students/create-attendance-entry",
+    tags=["Students"],
+)
+
+# /api/students/process-withdrawal
+api_router.include_router(
+    student_withdrawal_router,
+    prefix="/students/process-withdrawal",
     tags=["Students"],
 )
 
