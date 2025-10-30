@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     canvas_api_url: str = "https://cti-courses.test.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
     sa_whitelist: str = "SA Whitelist"
+    gsheet_write_rows_max: int = 998
 
 settings = Settings()
 

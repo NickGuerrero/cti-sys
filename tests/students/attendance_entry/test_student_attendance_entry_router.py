@@ -4,16 +4,20 @@ from gspread_dataframe import set_with_dataframe
 import pandas as pd
 from src.config import settings
 from src.students.attendance_entry import service as entry_service
-from src.gsheet.refresh.service import create_credentials
+from src.gsheet.utils import create_credentials
 
 class TestAttendanceEntry:
     @pytest.mark.integration
     @pytest.mark.gsheet
     def test_gsheet_whitelist_fetch(self):
         """ Test whitelist is fetch correctly, uses Test Worksheet """
+        # Create set of emails for testing sheet fetching functionality
+        # I'm adding my work email to make testing easier post-test calls
+        email_write = ["nicguerrero@csumb.edu", "example2@email.com", "example3@email.com"]
+        email_write.extend([""] * 50) # Clear any lingering emails from sheet
         # Set sheet values on sa_whitelist worksheet in the Test Spreadsheet
         df = pd.DataFrame({
-            "email": ["example1@email.com", "example2@email.com", "example3@email.com"]
+            "email": email_write
         })
         gc = create_credentials()
         sh = gc.open_by_key(settings.test_sheet_key)
@@ -22,7 +26,7 @@ class TestAttendanceEntry:
         # Verify email list is fetched correctly
         email_cache = entry_service.load_email_whitelist(settings.test_sheet_key, settings.sa_whitelist)
         assert len(email_cache) == 3
-        assert "example1@email.com" in email_cache
+        assert "nicguerrero@csumb.edu" in email_cache
         assert "example2@email.com" in email_cache
         assert "example3@email.com" in email_cache
 

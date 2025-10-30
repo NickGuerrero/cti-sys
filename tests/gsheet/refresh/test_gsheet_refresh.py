@@ -10,7 +10,8 @@ from src.main import app
 from src.config import settings
 from src.database.postgres.core import engine as CONN
 from src.database.postgres.core import SessionFactory
-import src.gsheet.refresh.service as service
+import src.gsheet.refresh.main.service as service
+import src.gsheet.utils as utils
 
 class TestGSheet:
     @pytest.mark.integration
@@ -27,7 +28,7 @@ class TestGSheet:
         assert response.status_code == 201
 
         # Check that at least the correct number of rows were written
-        gc = service.create_credentials()
+        gc = utils.create_credentials()
         output_spreadsheet = gc.open_by_key(environ.get("TEST_SHEET_KEY"))
         output_worksheet = output_spreadsheet.worksheet("Main Roster")
         output_df = pandas.DataFrame(output_worksheet.get_all_records())
@@ -36,6 +37,18 @@ class TestGSheet:
         # Note that modifying the test sheet during the test will break the assertion
         assert output_df.shape == roster_data.shape
         return
+    
+    @pytest.mark.integration
+    @pytest.mark.gsheet
+    def testRefreshAttendance(self, monkeypatch, client):
+        """
+        Check the Attendance endpoint is working
+        Used alonsgide above to test printing to GSheet
+        """
+        # Note that TEST_SHEET_KEY should only ever be called and used in testing
+        monkeypatch.setenv("ROSTER_SHEET_KEY", settings.test_sheet_key)
+        response = client.post("/api/gsheet/refresh/attendance")
+        assert response.status_code == 201
     
     @pytest.mark.integration
     @pytest.mark.gsheet

@@ -73,5 +73,5 @@ api_router.include_router(
 api_router.include_router(
     gsheet_refresh_router,
     prefix="/gsheet/refresh",
-    tags=["Students"],
+    tags=["GSheet"],
 )
