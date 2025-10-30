@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from gspread_dataframe import get_as_dataframe
 
 from src.config import settings
-from src.gsheet.refresh.service import create_credentials
+from src.gsheet.utils import create_credentials
 from src.database.postgres.models import Attendance
 from src.students.attendance_entry.schemas import AttendanceEntryRequest
 

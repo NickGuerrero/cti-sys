@@ -4,7 +4,7 @@ from gspread_dataframe import set_with_dataframe
 import pandas as pd
 from src.config import settings
 from src.students.attendance_entry import service as entry_service
-from src.gsheet.refresh.service import create_credentials
+from src.gsheet.utils import create_credentials
 
 class TestAttendanceEntry:
     @pytest.mark.integration
