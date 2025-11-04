@@ -105,12 +105,12 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include phone number of student as a string value"
                 },
                 "academic_year": {
-                    "bsonType": ["string", "null"],
-                    "description": "Must include the current undergraduate year of student as a string value (ex: 'First Year')"
+                    "bsonType": ["int", "null"],
+                    "description": "Must include number of years student has done in college (e.g. 0 for first-year, 1 second-year)"
                 },
                 "grad_year": {
-                    "bsonType": ["int", "null"],
-                    "description": "Must include expected graduation year as an integer value"
+                    "bsonType": ["string", "null"],
+                    "description": "Must include expected graduation year as string (e.g. Spring 2026, Fall 2027)"
                 },
                 "summers_left": {
                     "bsonType": ["int", "null"],
