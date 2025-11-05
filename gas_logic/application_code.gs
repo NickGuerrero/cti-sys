@@ -35,6 +35,17 @@ const qids = {
 const date_MDY = /([1-3]?\d)(\/|-)([1-3]?\d)(\/|-)(\d\d\d\d)/g;
 const date_YMD = /$5-$1-$3/g;
 
+// Remove parentheses for race/ethincity list
+function rem_paren(eth_arr){
+  if(eth_arr == ""){
+    return "";
+  }
+  for(let i = 0; i < eth_arr.length; i++){
+    eth_arr[i] = eth_arr[i].replace(/\s*\(.*\)\s*/g, "")
+  }
+  return eth_arr;
+}
+
 function onFormSubmit(e){
   // Declare form and submission for clarity
   let submission = e.response;
@@ -60,7 +71,7 @@ function onFormSubmit(e){
     academic_goals: nullify(get_response(form, submission, qids.academic_goals)),
     first_gen: nullify(get_response(form, submission, qids.first_gen)  == "Yes" ? true : false),
     gender: nullify(get_response(form, submission, qids.gender)),
-    race_ethnicity: nullify(get_response(form, submission, qids.race_ethnicity)),
+    race_ethnicity: nullify(rem_paren(get_response(form, submission, qids.race_ethnicity))),
     financial_need: nullify(get_response(form, submission, qids.financial_need)),
     heard_about: nullify(get_response(form, submission, qids.heard_about))
   };

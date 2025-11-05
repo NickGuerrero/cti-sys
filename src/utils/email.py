@@ -1,9 +1,10 @@
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from src.config import settings
 
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDER_EMAIL = os.getenv("SENDGRID_SENDER")
+SENDGRID_API_KEY = settings.sendgrid_api_key
+SENDER_EMAIL = settings.sendgrid_sender
 
 def send_email(to_email: str, subject: str, html_content: str) -> None:
     client = SendGridAPIClient(SENDGRID_API_KEY)
