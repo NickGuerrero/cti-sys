@@ -1,4 +1,3 @@
-import os
 from unittest.mock import MagicMock
 from mongomock import MongoClient as MockClient
 from pymongo import MongoClient
@@ -51,7 +50,7 @@ def mock_mongo_db():
 def real_mongo_db():
     """Injection for MongoDB dependency intended for wide scope, accurate integration testing"""
     # Consider replacing this with a conditionally created local instance (in GitHub Actions)
-    client = MongoClient(os.environ.get("CTI_MONGO_URL"))
+    client = MongoClient(settings.cti_mongo_url)
     test_db_name = "test_" + MONGO_DATABASE_NAME
     db = client[test_db_name]
     init_collections(db, with_validators=True)

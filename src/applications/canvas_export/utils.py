@@ -1,10 +1,8 @@
 import csv
 import io
-import os
 import tempfile
 from typing import Any, List
-
-from dotenv import load_dotenv
+from src.config import settings
 
 def get_csv_as_stream(
     headers: List[str],
@@ -44,9 +42,7 @@ def get_csv_as_tmp_file(
     return csvfile.name
 
 def get_canvas_access_token():
-    load_dotenv(override=True)
-
-    access_token = os.environ.get("CTI_ACCESS_TOKEN")
+    access_token = settings.cti_access_token
     if access_token is None:
         raise Exception("Access token not found")
     
