@@ -15,6 +15,9 @@ from src.database.postgres.models import (
 from sqlalchemy.exc import SQLAlchemyError
 from src.utils.email import send_email as raw_send_email
 
+import gspread
+from src.gsheet.utils import create_credentials
+
 def send_email_notification(
     to_email: str, 
     subject: str, 
@@ -57,7 +60,7 @@ def process_attendance(
             process_attendance_record(record, db=db, background_tasks=background_tasks)
             db.commit()
             sheets_processed += 1
-        except (requests.RequestException, ValueError, SQLAlchemyError):
+        except (requests.RequestException, ValueError, SQLAlchemyError, Exception):
             db.rollback()
             sheets_failed += 1
 
@@ -202,65 +205,57 @@ def process_attendance_row(
 
 def fetch_csv_dataframe(link: str) -> pd.DataFrame:
     """
-    Converts a Google Sheet link to a CSV export link, fetches CSV,
-    returns a pandas DataFrame. Checks for 'Name' and 'Email' columns.
-    Raises ValueError if missing columns or fetch fails.
+    Fetches the CSV data from the given Google Sheets link and returns it as a pandas DataFrame.
+    It looks for the worksheet that contains "Name", "Email", and at least one "Slide " column.
     """
-
-    # Fetch CSV from Google Sheets
-    csv_url = convert_google_sheet_link_to_csv(link)
-    resp = requests.get(csv_url)
-    resp.raise_for_status()
-
-    decoded_str = resp.content.decode("utf-8")
-
-    # Read CSV from string
-    df = pd.read_csv(io.StringIO(decoded_str))
-
-    # Clean up column names with extra spaces
+    # Authenticate with gspread
+    if settings.app_env == "production":
+        gc = create_credentials()
+    else:
+        gc = gspread.service_account(filename='gspread_credentials.json')
+    
+    spreadsheet = gc.open_by_url(link)
+    
+    # Check all worksheets to find the one with attendance data
+    for worksheet in spreadsheet.worksheets():
+        try:
+            # Get all values from the worksheet
+            all_values = worksheet.get_all_values()
+            if not all_values:
+                continue
+            
+            # Extract headers
+            headers = [str(h).strip() for h in all_values[0]]
+            
+            # Check if this worksheet has the required columns
+            has_name = "Name" in headers
+            has_email = "Email" in headers
+            has_slides = any(col.startswith("Slide ") for col in headers)
+            
+            if has_name and has_email and has_slides:
+                # Convert to DataFrame 
+                df = pd.DataFrame(all_values[1:], columns=headers)
+                
+                # Clean up column names with extra spaces
+                df.columns = [col.strip() for col in df.columns]
+                
+                return df
+                
+        except Exception:
+            continue
+    
+    # Fallback to first worksheet if no match found
+    first_worksheet = spreadsheet.get_worksheet(0)
+    all_values = first_worksheet.get_all_values()
+    
+    if not all_values:
+        raise ValueError("Worksheet is empty.")
+    
+    df = pd.DataFrame(all_values[1:], columns=all_values[0])
     df.columns = [col.strip() for col in df.columns]
-
+    
     # Check for required columns
     if "Name" not in df.columns or "Email" not in df.columns:
         raise ValueError("Required columns (Name, Email) not found in CSV.")
-
+    
     return df
-
-def convert_google_sheet_link_to_csv(link: str) -> str:
-    """
-    Convert a standard Google Sheets URL into a CSV export URL, e.g.
-    https://docs.google.com/spreadsheets/d/<DOC_ID>/export?format=csv&gid=<GID>
-    """
-    parsed = urlparse(link)
-
-    # Extract doc ID
-    doc_id = None
-    if "/d/" in parsed.path:
-        try:
-            after_d = parsed.path.split("/d/")[1]
-            doc_id = after_d.split("/")[0]
-        except IndexError:
-            pass
-    if not doc_id:
-        raise ValueError(f"Unable to parse doc ID from: {link}")
-
-    # Extract gid
-    gid_value = None
-    query_params = parse_qs(parsed.query)
-    if "gid" in query_params and len(query_params["gid"]) > 0:
-        gid_value = query_params["gid"][0]
-
-    # If gid is not found in query, check the fragment
-    # This is common in Google Sheets URLs
-    if not gid_value and parsed.fragment:
-        frag_params = parse_qs(parsed.fragment)
-        if "gid" in frag_params and len(frag_params["gid"]) > 0:
-            gid_value = frag_params["gid"][0]
-
-    if not gid_value:
-        gid_value = "0"
-
-    # Construct the CSV export URL
-    # Default gid is 0 if not found
-    return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid_value}"
-

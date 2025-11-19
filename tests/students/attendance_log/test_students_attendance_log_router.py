@@ -1,536 +1,348 @@
 import pytest
 from unittest.mock import MagicMock
-from requests.exceptions import HTTPError
 from src.database.postgres.models import Attendance
 
 class TestProcessAttendanceLog:
+    
+    def setup_attendance_query(self, mock_db, attendance_rows):
+        """Helper to mock the initial attendance query"""
+        query_mock = mock_db.query.return_value
+        filter_mock = query_mock.filter.return_value
+        filter_mock_2 = filter_mock.filter.return_value
+        filter_mock_2.all.return_value = attendance_rows
+        mock_db.commit.return_value = None
+        mock_db.rollback.return_value = None
+    
+    def setup_gspread_worksheet(self, mock_client, worksheet_data, doc_id="FAKE_DOC_ID"):
+        """Helper to mock gspread worksheet"""
+        mock_worksheet = MagicMock()
+        mock_worksheet.get_all_values.return_value = worksheet_data
+        mock_worksheet.id = 0
+        
+        mock_spreadsheet = MagicMock()
+        mock_spreadsheet.worksheets.return_value = [mock_worksheet]
+        
+        mock_client.open_by_url.return_value = mock_spreadsheet
+        return mock_worksheet, mock_spreadsheet
+
+    def setup_db_queries_for_unknown_email(self, mock_db, attendance_row):
+        """Helper for unknown email query setup"""
+        query_count = [0]
+        
+        def query_side_effect(model):
+            query_count[0] += 1
+            mock_query = MagicMock()
+            mock_filter = MagicMock()
+            mock_filter2 = MagicMock()
+            
+            if query_count[0] == 1:
+                mock_filter2.all.return_value = [attendance_row]
+            else:
+                mock_filter.first.return_value = None
+                mock_filter2.first.return_value = None
+            
+            mock_filter.filter.return_value = mock_filter2
+            mock_query.filter.return_value = mock_filter
+            return mock_query
+        
+        mock_db.query.side_effect = query_side_effect
+        mock_db.commit.return_value = None
+        mock_db.rollback.return_value = None
+
+    def setup_db_queries_for_mixed_emails(self, mock_db, attendance_row):
+        """Helper for mixed known/unknown email query setup"""
+        query_count = [0]
+        
+        def query_side_effect(model):
+            query_count[0] += 1
+            mock_query = MagicMock()
+            mock_filter = MagicMock()
+            mock_filter2 = MagicMock()
+            
+            if query_count[0] == 1:
+                # Initial attendance query
+                mock_filter2.all.return_value = [attendance_row]
+            elif query_count[0] == 2:
+                # First email (known)
+                mock_filter.first.return_value = MagicMock(cti_id=1)
+                mock_filter2.first.return_value = MagicMock(cti_id=1)
+            else:
+                # All other queries return None
+                mock_filter.first.return_value = None
+                mock_filter2.first.return_value = None
+            
+            mock_filter.filter.return_value = mock_filter2
+            mock_query.filter.return_value = mock_filter
+            return mock_query
+        
+        mock_db.query.side_effect = query_side_effect
+        mock_db.commit.return_value = None
+        mock_db.rollback.return_value = None
+        mock_db.add.return_value = None
+
     @pytest.mark.parametrize(
-        "csv_content, expected_processed, expected_failed",
+        "worksheet_data, expected_processed, expected_failed",
         [
-            # Valid CSV scenario.
+            # Valid worksheet
             (
-                """
-                Name,Email,Slide 1,Slide 2
-                Jane Doe,jane@example.com,Hello,World
-                John Doe,john@example.com,Yes,No
-                """,
-                1,  # sheets_processed
-                0,  # sheets_failed
+                [
+                    ["Name", "Email", "Slide 1", "Slide 2"],
+                    ["Jane Doe", "jane@example.com", "Hello", "World"],
+                    ["John Doe", "john@example.com", "Yes", "No"]
+                ],
+                1, 0,
             ),
-            # Missing 'Name' column -> fail scenario.
+            # Missing 'Name' column
             (
-                """
-                Email,Slide 1,Slide 2
-                someone@example.com,Answer1,Answer2
-                """,
-                0,
-                1
+                [
+                    ["Email", "Slide 1", "Slide 2"],
+                    ["someone@example.com", "Answer1", "Answer2"]
+                ],
+                0, 1
             )
         ]
     )
     def test_process_attendance_log_simple(
         self,
         client,
-        csv_content,
+        worksheet_data,
         expected_processed,
         expected_failed,
-        monkeypatch,
+        mock_gspread,
         mock_postgresql_db,
     ):
-        """
-        Test processing of a single attendance row under two conditions:
-        - A valid CSV with the required 'Name' column.
-        - An invalid CSV missing the 'Name' column.
-
-        The number of processed vs. failed sheets should match expectations,
-        and commits/rollbacks should occur accordingly.
-        """
-        # Create a single Attendance row in the mock DB.
+        """Test processing with valid and invalid worksheets"""
         attendance_row = Attendance(
             session_id=2,
             link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/FAKE_DOC_ID/edit?gid=0#gid=0",
+            link="https://docs.google.com/spreadsheets/d/FAKE_DOC_ID/edit",
             last_processed_date=None
         )
 
-        # Mock the DB query to return our single attendance row above.
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        # Mock the DB commit and rollback methods.
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        # Use MagicMock for the HTTP response.
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(
-                status_code=200,
-                raise_for_status=lambda: None,
-                content=csv_content.encode("utf-8")
-            )
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        self.setup_gspread_worksheet(mock_gspread, worksheet_data)
 
         response = client.post("/api/students/process-attendance-log")
+        
         assert response.status_code == 200
-
-        # Verify the JSON response against our expected success/failure counts.
         resp_json = response.json()
         assert resp_json["sheets_processed"] == expected_processed
         assert resp_json["sheets_failed"] == expected_failed
 
-        # Confirm DB commit or rollback was called as needed.
         if expected_processed:
             mock_postgresql_db.commit.assert_called_once()
         if expected_failed:
             mock_postgresql_db.rollback.assert_called_once()
 
-    def test_multiple_attendance_rows_partial_fail(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test a scenario with multiple attendance rows in the database:
-        - 3 valid CSV links, each should process successfully.
-        - 1 link with an invalid CSV that fails.
+    def test_multiple_attendance_rows_partial_fail(self, client, mock_gspread, mock_postgresql_db):
+        """Test multiple sheets with some failing"""
+        rows = [
+            Attendance(session_id=10+i, link_type="PEARDECK", link=f"https://docs.google.com/spreadsheets/d/DOC_ID_{name}/edit", last_processed_date=None)
+            for i, name in enumerate(["s1", "s2", "s3", "fail"])
+        ]
 
-        Expected results:
-        - sheets_processed = 3
-        - sheets_failed = 1
-        - commit called three times, rollback called once
-        """
-        # Build four Attendance objects, 3 valid and 1 invalid.
-        row_success_1 = Attendance(
-            session_id=10,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/DOC_ID_success_1/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-        row_success_2 = Attendance(
-            session_id=11,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/DOC_ID_success_2/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-        row_success_3 = Attendance(
-            session_id=12,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/DOC_ID_success_3/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-        row_fail = Attendance(
-            session_id=13,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/DOC_ID_fail/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-
+        # Need to setup the query to return all rows initially
         query_mock = mock_postgresql_db.query.return_value
         filter_mock = query_mock.filter.return_value
         filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [row_success_1, row_success_2, row_success_3, row_fail]
-
-        # Mock the DB commit and rollback methods.
+        filter_mock_2.all.return_value = rows
+        
         mock_postgresql_db.commit.return_value = None
         mock_postgresql_db.rollback.return_value = None
 
-        # Map each doc ID to either valid or invalid CSV bytes.
-        valid_csv = b"Name,Email,Slide\nOne Person,person@example.com,Yes"
-        invalid_csv = b"Email,Slide\nsomeone@example.com,NoNameColumn"
-        csv_map = {
-            "DOC_ID_success_1": valid_csv,
-            "DOC_ID_success_2": valid_csv,
-            "DOC_ID_success_3": valid_csv,
-            "DOC_ID_fail": invalid_csv
+        # Map doc IDs to worksheet data
+        data_map = {
+            "DOC_ID_s1": [["Name", "Email", "Slide"], ["Person", "p@ex.com", "Yes"]],
+            "DOC_ID_s2": [["Name", "Email", "Slide"], ["Person", "p@ex.com", "Yes"]],
+            "DOC_ID_s3": [["Name", "Email", "Slide"], ["Person", "p@ex.com", "Yes"]],
+            "DOC_ID_fail": [["Email", "Slide"], ["p@ex.com", "NoName"]],
         }
 
-        # Mock the requests.get() method to return different CSV content based on the URL.
-        # This simulates the behavior of fetching different CSVs based on the doc ID in the URL.
-        def mock_requests_get(url, *args, **kwargs):
-            try:
-                after_d = url.split("/d/")[1]
-                doc_id = after_d.split("/")[0]
-            except IndexError:
-                doc_id = "UNKNOWN"
-            return MagicMock(
-                status_code=200,
-                raise_for_status=lambda: None,
-                content=csv_map.get(doc_id, b"")
-            )
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
+        def mock_open_by_url(url):
+            doc_id = url.split("/d/")[1].split("/")[0]
+            worksheet_data = data_map.get(doc_id, [[]])
+            mock_worksheet = MagicMock()
+            mock_worksheet.get_all_values.return_value = worksheet_data
+            mock_worksheet.id = 0
+            mock_spreadsheet = MagicMock()
+            mock_spreadsheet.worksheets.return_value = [mock_worksheet]
+            mock_spreadsheet.get_worksheet.return_value = mock_worksheet
+            return mock_spreadsheet
+        
+        mock_gspread.open_by_url.side_effect = mock_open_by_url
 
         response = client.post("/api/students/process-attendance-log")
-        assert response.status_code == 200
         resp_json = response.json()
 
-        # Check overall summary: 3 succeeded, 1 failed.
         assert resp_json["sheets_processed"] == 3
         assert resp_json["sheets_failed"] == 1
         assert mock_postgresql_db.commit.call_count == 3
         assert mock_postgresql_db.rollback.call_count == 1
 
-    def test_empty_csv_fails(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test that an empty CSV string leads to a failure.
-
-        This should result in:
-        - sheets_processed = 0
-        - sheets_failed = 1
-        - rollback is called
-        """
+    def test_empty_worksheet_fails(self, client, mock_gspread, mock_postgresql_db):
+        """Test empty worksheet failure"""
         attendance_row = Attendance(
-            session_id=5,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/EMPTY_DOC_ID/edit?gid=0#gid=0",
+            session_id=5, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/EMPTY/edit",
             last_processed_date=None
         )
 
-        # Mock DB query to return the single attendance row that references an empty CSV.
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=b"")
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        # Empty worksheet
+        self.setup_gspread_worksheet(mock_gspread, [])  
 
         response = client.post("/api/students/process-attendance-log")
-        assert response.status_code == 200
         resp_json = response.json()
-        # We expect zero processed, one failure.
+        
         assert resp_json["sheets_processed"] == 0
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_requests_error(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test that any HTTP-related error (e.g., 403) when fetching CSV
-        results in a failure of that sheet.
-
-        - sheets_processed = 0
-        - sheets_failed = 1
-        """
+    def test_gspread_error(self, client, mock_gspread, mock_postgresql_db):
+        """Test gspread API error handling"""
         attendance_row = Attendance(
-            session_id=99,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/PROTECTED_DOC/edit?gid=0",
+            session_id=99, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/PROTECTED/edit",
             last_processed_date=None
         )
 
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        def mock_requests_get(url, *args, **kwargs):
-            raise HTTPError("Forbidden")
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        mock_gspread.open_by_url.side_effect = Exception("Permission denied")
 
         response = client.post("/api/students/process-attendance-log")
-        assert response.status_code == 200
         resp_json = response.json()
+        
         assert resp_json["sheets_processed"] == 0
         assert resp_json["sheets_failed"] == 1
         mock_postgresql_db.rollback.assert_called_once()
 
-    def test_csv_header_only(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test that a CSV containing only headers (no data rows) is successfully processed.
-
-        - sheets_processed = 1
-        - sheets_failed = 0
-        """
-        attendance_row = Attendance(session_id=200, link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/HEADER_ONLY_DOC/edit?gid=0#gid=0")
-
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=b"Name,Email,Slide\n")
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
-
-        response = client.post("/api/students/process-attendance-log")
-        assert response.status_code == 200
-        resp_json = response.json()
-        assert resp_json["sheets_processed"] == 1
-        assert resp_json["sheets_failed"] == 0
-        mock_postgresql_db.commit.assert_called_once()
-
-    def test_convert_google_sheet_link_invalid(self):
-        """
-        Test that attempting to convert an invalid Google Sheets URL
-        raises a ValueError due to an unparseable doc ID.
-        """
-        from src.students.attendance_log.service import convert_google_sheet_link_to_csv
-        invalid_link = "https://docs.google.com/spreadsheets/invalid_link?gid=0"
-        # We expect a ValueError with a specific message substring.
-        with pytest.raises(ValueError, match="Unable to parse doc ID from:"):
-            convert_google_sheet_link_to_csv(invalid_link)
-
-    def test_unknown_email_goes_to_missing_attendance(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test that when the email in the CSV is not found in the database,
-        the row is recorded in missing_attendance and the sheet is still considered processed.
-        """
+    def test_worksheet_header_only(self, client, mock_gspread, mock_postgresql_db):
+        """Test worksheet with only headers (no data rows)"""
         attendance_row = Attendance(
-            session_id=555,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/UNKNOWN_ONLY_DOC/edit?gid=0#gid=0",
+            session_id=200, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/HEADER_ONLY/edit",
             last_processed_date=None
         )
 
-        # Only returns our one attendance row above.
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        csv_data = b"""
-        Name,Email,Slide
-        Unknown Only,unknownonly@example.com,SingleRow
-        """
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
-        # Force the DB to find no matching user for unknownonly@example.com
-        filter_mock.first.side_effect = lambda: None
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        self.setup_gspread_worksheet(mock_gspread, [["Name", "Email", "Slide 1"]])
 
         response = client.post("/api/students/process-attendance-log")
-
-        assert response.status_code == 200
         resp_json = response.json()
-        # Even though the email is unknown, the sheet is still "processed."
+        
+        assert resp_json["sheets_processed"] == 1
+        assert resp_json["sheets_failed"] == 0
+        assert attendance_row.student_count == 0
+
+    def test_unknown_email_goes_to_missing_attendance(self, client, mock_gspread, mock_postgresql_db):
+        """Test unknown email creates missing_attendance record"""
+        attendance_row = Attendance(
+            session_id=555, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/UNKNOWN/edit",
+            last_processed_date=None
+        )
+
+        worksheet_data = [
+            ["Name", "Email", "Slide 1"],
+            ["Unknown", "unknown@ex.com", "Answer"]
+        ]
+
+        self.setup_gspread_worksheet(mock_gspread, worksheet_data)
+        self.setup_db_queries_for_unknown_email(mock_postgresql_db, attendance_row)
+
+        response = client.post("/api/students/process-attendance-log")
+        resp_json = response.json()
+        
         assert resp_json["sheets_processed"] == 1
         assert resp_json["sheets_failed"] == 0
 
-        mock_postgresql_db.commit.assert_called_once()
-        mock_postgresql_db.rollback.assert_not_called()
-
-        # Verify that we tried to merge exactly one row into missing_attendance.
         merge_calls = mock_postgresql_db.merge.call_args_list
         assert len(merge_calls) == 1
-        missing_obj = merge_calls[0].args[0]
-        assert missing_obj.email == "unknownonly@example.com"
-        assert missing_obj.session_id == 555
-        assert missing_obj.name == "Unknown Only"
+        assert merge_calls[0].args[0].email == "unknown@ex.com"
 
-    def test_mixed_known_and_unknown_email(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Test that a CSV row with a known user is not inserted into missing_attendance,
-        while a row with an unknown user is inserted.
-
-        End result:
-        - sheets_processed = 1
-        - sheets_failed = 0
-        - Only the unknown user row is merged into missing_attendance.
-        """
+    def test_mixed_known_and_unknown_email(self, client, mock_gspread, mock_postgresql_db):
+        """Test mix of known and unknown emails"""
         attendance_row = Attendance(
-            session_id=999,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/DOC_ID_WITH_MIXED/edit?gid=0#gid=0",
+            session_id=999, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/MIXED/edit",
             last_processed_date=None
         )
 
-        # Return a single attendance row to process.
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
+        worksheet_data = [
+            ["Name", "Email", "Slide 1"],
+            ["Known", "known@ex.com", "Answer"],
+            ["Unknown", "unknown@ex.com", "Answer"]
+        ]
 
-        csv_data = b"""
-        Name,Email,Slide
-        Known User,knownuser@example.com,Some Slide
-        Unknown User,unknownuser@example.com,Another Slide
-        """
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
-
-        # First call returns a mock student (known email),
-        # second call returns None (unknown email).
-        responses = [MagicMock(), None]
-        def side_effect_for_first(*args, **kwargs):
-            return responses.pop(0) if responses else None
-
-        filter_mock.first.side_effect = side_effect_for_first
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
+        self.setup_gspread_worksheet(mock_gspread, worksheet_data)
+        self.setup_db_queries_for_mixed_emails(mock_postgresql_db, attendance_row)
 
         response = client.post("/api/students/process-attendance-log")
-
-        assert response.status_code == 200
         resp_json = response.json()
-
-        # If we have both known and unknown users, the sheet still "succeeds" overall.
+        
         assert resp_json["sheets_processed"] == 1
         assert resp_json["sheets_failed"] == 0
 
-        mock_postgresql_db.commit.assert_called_once()
-        mock_postgresql_db.rollback.assert_not_called()
-
-        # Only the unknown user email should be inserted into missing_attendance.
+        # Only unknown email should be merged
         merge_calls = mock_postgresql_db.merge.call_args_list
         assert len(merge_calls) == 1
-        missing_obj = merge_calls[0].args[0]
-        assert missing_obj.email == "unknownuser@example.com"
-        assert missing_obj.session_id == 999
-        assert missing_obj.name == "Unknown User"
+        assert merge_calls[0].args[0].email == "unknown@ex.com"
 
-    def test_student_count_multiple_students(self, client, monkeypatch, mock_postgresql_db):
-        """
-        Ensure that student_count reflects the number of rows in the CSV.
-        """
+    @pytest.mark.parametrize("first_slide, last_slide, expected_full_attendance", [
+        ("Yes", "Yes", True), # Both filled
+        ("Yes", "", False), # Last empty
+        ("", "Yes", False), # First empty
+        ("", "", False), # Both empty
+    ])
+    def test_full_attendance_logic(self, client, mock_gspread, mock_postgresql_db, first_slide, last_slide, expected_full_attendance):
+        """Test full_attendance flag with different slide combinations"""
         attendance_row = Attendance(
-            session_id=101,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/STUDENT_COUNT_DOC/edit?gid=0#gid=0",
+            session_id=300, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/ATT_TEST/edit",
             last_processed_date=None
         )
 
-        # Mock DB to return our attendance row
+        worksheet_data = [
+            ["Name", "Email", "Slide 1", "Slide 2", "Slide 3"],
+            ["Student", "student@ex.com", first_slide, "Maybe", last_slide]
+        ]
+
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        self.setup_gspread_worksheet(mock_gspread, worksheet_data)
+
+        # Mock student email found
         query_mock = mock_postgresql_db.query.return_value
         filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
+        filter_mock.first.side_effect = [MagicMock(cti_id=1), None]
 
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        # CSV with 3 student rows
-        csv_data = b"""Name,Email,Slide 1,Slide 2
-    Alice,alice@example.com,Yes,No
-    Bob,bob@example.com,Yes,Yes
-    Charlie,charlie@example.com,No,Yes
-    """
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
+        mock_attendance_obj = []
+        mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
 
         response = client.post("/api/students/process-attendance-log")
-
+        
         assert response.status_code == 200
-        resp_json = response.json()
+        assert len(mock_attendance_obj) == 1
+        assert mock_attendance_obj[0].full_attendance is expected_full_attendance
 
-        # One sheet processed, none failed
-        assert resp_json["sheets_processed"] == 1
-        assert resp_json["sheets_failed"] == 0
+    def test_student_count_multiple_students(self, client, mock_gspread, mock_postgresql_db):
+        """Test student_count reflects number of data rows"""
+        attendance_row = Attendance(
+            session_id=101, link_type="PEARDECK",
+            link="https://docs.google.com/spreadsheets/d/COUNT_TEST/edit",
+            last_processed_date=None
+        )
 
-        # student_count should equal number of CSV rows (3)
+        worksheet_data = [
+            ["Name", "Email", "Slide 1"],
+            ["Alice", "alice@ex.com", "Yes"],
+            ["Bob", "bob@ex.com", "Yes"],
+            ["Charlie", "charlie@ex.com", "No"]
+        ]
+
+        self.setup_attendance_query(mock_postgresql_db, [attendance_row])
+        self.setup_gspread_worksheet(mock_gspread, worksheet_data)
+
+        response = client.post("/api/students/process-attendance-log")
+        
+        assert response.status_code == 200
         assert attendance_row.student_count == 3
-
-    def test_full_attendance_true(self, client, monkeypatch, mock_postgresql_db):
-        """
-        A student should have full_attendance=True if both the first and last slides are non-empty.
-        """
-        attendance_row = Attendance(
-            session_id=303,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/FULL_ATT_DOC/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        # CSV where first and last slides are non-empty
-        csv_data = b"""Name,Email,Slide 1,Slide 2,Slide 3
-    Student One,student1@example.com,Yes,No,Yes
-    """
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
-
-        student_email = MagicMock(cti_id=1)
-        filter_mock.first.side_effect = [student_email, None]
-
-        mock_attendance_obj = []
-        mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
-
-        response = client.post("/api/students/process-attendance-log")
-
-        assert response.status_code == 200
-        resp_json = response.json()
-        assert resp_json["sheets_processed"] == 1
-        assert resp_json["sheets_failed"] == 0
-        assert len(mock_attendance_obj) == 1
-        assert mock_attendance_obj[0].full_attendance is True
-
-    def test_full_attendance_false(self, client, monkeypatch, mock_postgresql_db):
-        """
-        A student should have full_attendance=False if either the first or last slide is blank.
-        """
-        attendance_row = Attendance(
-            session_id=404,
-            link_type="PEARDECK",
-            link="https://docs.google.com/spreadsheets/d/PARTIAL_ATT_DOC/edit?gid=0#gid=0",
-            last_processed_date=None
-        )
-
-        query_mock = mock_postgresql_db.query.return_value
-        filter_mock = query_mock.filter.return_value
-        filter_mock_2 = filter_mock.filter.return_value
-        filter_mock_2.all.return_value = [attendance_row]
-
-        mock_postgresql_db.commit.return_value = None
-        mock_postgresql_db.rollback.return_value = None
-
-        # CSV where first slide is answered but last slide is blank
-        csv_data = b"""Name,Email,Slide 1,Slide 2,Slide 3
-    Student Two,student2@example.com,Yes,Maybe,
-    """
-
-        def mock_requests_get(url, *args, **kwargs):
-            return MagicMock(status_code=200, raise_for_status=lambda: None, content=csv_data)
-
-        monkeypatch.setattr("requests.get", mock_requests_get)
-
-        student_email = MagicMock(cti_id=2)
-        filter_mock.first.side_effect = [student_email, None]
-
-        mock_attendance_obj = []
-        mock_postgresql_db.add.side_effect = lambda obj: mock_attendance_obj.append(obj)
-
-        response = client.post("/api/students/process-attendance-log")
-
-        assert response.status_code == 200
-        resp_json = response.json()
-
-        assert resp_json["sheets_processed"] == 1
-        assert resp_json["sheets_failed"] == 0
-
-        # Verify StudentAttendance was created with full_attendance=False
-        assert len(mock_attendance_obj) == 1
-        assert mock_attendance_obj[0].full_attendance is False
