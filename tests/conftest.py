@@ -10,6 +10,22 @@ from src.database.mongo.core import get_mongo
 from src.database.mongo.service import init_collections
 from src.database.postgres.core import make_session
 from src.main import app
+import gspread
+
+@pytest.fixture(scope="function")
+def mock_gspread(monkeypatch):
+    """
+    Fixture to mock gspread authentication.
+    This overrides both production and development credential paths.
+    """
+    mock_gc = MagicMock(spec=gspread.Client)
+    
+    # Mock the production path
+    monkeypatch.setattr("src.gsheet.utils.create_credentials", lambda: mock_gc)
+    # Mock the development path
+    monkeypatch.setattr("gspread.service_account", lambda filename: mock_gc)
+    
+    return mock_gc
 
 # Fixtures for tests
 @pytest.fixture(scope="session", autouse=True)
