@@ -1,4 +1,5 @@
 from src.database.postgres.core import *
+from src.database.postgres.models import *
 
 # Create database from the current model set-up
 # Use alembic scripts to upgrade between deployment TODO
@@ -9,9 +10,7 @@ Base.metadata.create_all(engine)
 # From the cookbook: https://alembic.sqlalchemy.org/en/latest/cookbook.html#building-an-up-to-date-database-from-scratch
 
 # Temporarily disable alembic until errors resolved
-'''
 from alembic.config import Config
 from alembic import command
-alembic_cfg = Config("/../../alembic.ini")
+alembic_cfg = Config("alembic.ini")
 command.stamp(alembic_cfg, "head")
-'''
