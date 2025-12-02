@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     gs_project_id: Optional[str] = Field(validation_alias="GS_PROJECT_ID", default=None)
 
     # Application Constants
-    canvas_api_url: str = "https://cti-courses.test.instructure.com"
+    canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
     sa_whitelist: str = "SA Whitelist"
     gsheet_write_rows_max: int = 998
