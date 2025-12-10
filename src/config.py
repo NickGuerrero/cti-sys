@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     sa_whitelist: str = "SA Whitelist"
     gsheet_write_rows_max: int = 998
 
+    # Thresholds in weeks for determining if a student is active
+    activity_attendance_threshold_weeks: int = Field(default=2, description="Number of weeks to check for attendance activity")
+    activity_canvas_threshold_weeks: int = Field(default=2, description="Number of weeks to check for Canvas activity")
+    
 settings = Settings()
 
 # TODO: Move these into the settings object properly
