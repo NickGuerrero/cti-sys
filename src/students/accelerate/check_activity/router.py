@@ -12,14 +12,12 @@ router = APIRouter()
 
 @router.post("", status_code=status.HTTP_200_OK)
 def check_all_students_activity(
-    attendance_threshold_weeks: Optional[int] = Query(None, ge=1),
-    canvas_threshold_weeks: Optional[int] = Query(None, ge=1),
     db: Session = Depends(make_session),
 ) -> Dict[str, Any]:
     """Check and update activity for all active Accelerate students."""
     try:
-        att_threshold = attendance_threshold_weeks or settings.activity_attendance_threshold_weeks
-        canvas_threshold = canvas_threshold_weeks or settings.activity_canvas_threshold_weeks
+        att_threshold = settings.activity_attendance_threshold_weeks
+        canvas_threshold = settings.activity_canvas_threshold_weeks
         
         results = service.check_all_students(db, att_threshold, canvas_threshold)
         

@@ -22,10 +22,11 @@ def upgrade() -> None:
     # Add last_canvas_access column to accelerate_course_progress
     op.add_column(
         'accelerate_course_progress',
-        sa.Column('last_canvas_access', sa.DateTime(timezone=True), nullable=True)
+        sa.Column('last_canvas_access', sa.DateTime(timezone=False), nullable=True)
     )
 
 
 def downgrade() -> None:
     # Drop column
     op.drop_column('accelerate_course_progress', 'last_canvas_access')
+    
