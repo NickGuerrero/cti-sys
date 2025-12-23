@@ -1,9 +1,7 @@
 from logging.config import fileConfig
-import os
-
 from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
-
+from src.config import settings
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -22,9 +20,9 @@ target_metadata = models.Base.metadata
 
 # map Alembic environment names to DB URLs
 DB_URLS = {
-    "development": os.getenv("DEV_DATABASE_URL"),
-    "production": os.getenv("PROD_DATABASE_URL"),
-    "custom": os.getenv("CUSTOM_DATABASE_URL"),
+    "development": settings.dev_database_url,
+    "production": settings.prod_database_url,
+    "custom": settings.custom_database_url,
 }
 
 def get_url() -> str:
@@ -39,9 +37,8 @@ def get_url() -> str:
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-from os import environ as env
 def env_url():
-    return env.get("CTI_POSTGRES_URL")
+    return settings.cti_postgres_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
