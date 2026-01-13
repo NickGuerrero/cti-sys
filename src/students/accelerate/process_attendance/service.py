@@ -21,6 +21,8 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
 
     Always returns { status = 200, records_updated = int}.
     """
+    print("0. Works")
+
     acc_rows = load_active_accelerate_records(db)
     print("1. Works")
     attend_rows = load_attendance_rows(db, [a.cti_id for a in acc_rows])
