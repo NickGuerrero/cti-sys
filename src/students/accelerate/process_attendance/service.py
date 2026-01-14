@@ -22,17 +22,14 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
     Always returns { status = 200, records_updated = int}.
     """
     acc_rows = load_active_accelerate_records(db)
-    print("1. Works")
     attend_rows = load_attendance_rows(db, [a.cti_id for a in acc_rows])
-    print("2. Works")
 
-    per_student = group_attendance_by_student(attend_rows)
-    print("3. Works")
-    updated = update_accelerate_records(db, acc_rows, per_student)
-    print("4. Works")
+    # per_student = group_attendance_by_student(attend_rows)
+    # updated = update_accelerate_records(db, acc_rows, per_student)
+    updated = "TEST"
+    print(attend_rows)
 
-    db.commit()
-    print("5. Works")
+    # db.commit()
     return {"status": 200, "records_updated": updated}
 
 
@@ -69,13 +66,13 @@ def load_attendance_rows(
             select(
                 StudentAttendance.cti_id,
                 Attendance.session_start,
+                StudentAttendance.peardeck_score,
             )
             .join(Attendance, Attendance.session_id == StudentAttendance.session_id)
             .where(StudentAttendance.cti_id.in_(cti_ids))
         )
         .all()
     )
-    print(rows)
     # Convert datetime to date for easier week bucketing
     return [(cid, sess.date(), score) for cid, sess, score in rows]
 
