@@ -20,7 +20,6 @@ def process_accelerate_attendance(db: Session = Depends(make_session)) -> Dict[s
     """
     # return process_accelerate_metrics(db)
     try:
-        print("Test starting")
         return process_accelerate_metrics(db)
     except Exception as e:
         handle_db_exceptions(db, e)
