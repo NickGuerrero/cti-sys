@@ -24,12 +24,10 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
     acc_rows = load_active_accelerate_records(db)
     attend_rows = load_attendance_rows(db, [a.cti_id for a in acc_rows])
 
-    # per_student = group_attendance_by_student(attend_rows)
-    # updated = update_accelerate_records(db, acc_rows, per_student)
-    updated = 1
-    print(attend_rows)
+    per_student = group_attendance_by_student(attend_rows)
+    updated = update_accelerate_records(db, acc_rows, per_student)
 
-    # db.commit()
+    db.commit()
     return {"status": 200, "records_updated": updated}
 
 
