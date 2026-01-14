@@ -26,7 +26,7 @@ def process_accelerate_metrics(db: Session) -> Dict[str, int]:
 
     # per_student = group_attendance_by_student(attend_rows)
     # updated = update_accelerate_records(db, acc_rows, per_student)
-    updated = "TEST"
+    updated = 1
     print(attend_rows)
 
     # db.commit()
