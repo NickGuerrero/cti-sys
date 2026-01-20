@@ -64,6 +64,7 @@ def load_attendance_rows(
             select(
                 StudentAttendance.cti_id,
                 Attendance.session_start,
+                StudentAttendance.peardeck_score,
             )
             .join(Attendance, Attendance.session_id == StudentAttendance.session_id)
             .where(StudentAttendance.cti_id.in_(cti_ids))
