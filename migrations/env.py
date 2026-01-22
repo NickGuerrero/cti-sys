@@ -29,7 +29,7 @@ DB_URLS = {
 
 def get_url() -> str:
     # Alembic Command line: alembic -x environment=development
-    env_name = config.get_main_option("environment") or "development"
+    env_name = context.get_x_argument(as_dictionary=True).get("environment") or "development"
     url = DB_URLS.get(env_name)
     if not url:
         raise RuntimeError(f"No database URL configured for environment '{env_name}'")

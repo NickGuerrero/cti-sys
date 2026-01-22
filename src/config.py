@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     gs_private_key_id: Optional[str] = Field(validation_alias="GS_PRIVATE_KEY_ID", default=None)
     gs_project_id: Optional[str] = Field(validation_alias="GS_PROJECT_ID", default=None)
 
+    # Thresholds in weeks for determining if a student is active
+    activity_attendance_threshold_weeks: int = Field(validation_alias="ACTIVITY_ATTENDANCE_THRESHOLD_WEEKS",
+                                                     default=2,
+                                                     description="Number of weeks to check for attendance activity")
+    activity_canvas_threshold_weeks: int = Field(validation_alias="ACTIVITY_CANVAS_THRESHOLD_WEEKS",
+                                                 default=2,
+                                                 description="Number of weeks to check for Canvas activity")
+
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"

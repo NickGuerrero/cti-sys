@@ -6,6 +6,7 @@ from src.applications.master_roster.router import router as applications_add_to_
 from src.students.alternate_emails.router import router as student_alternate_emails_router
 from src.students.attendance_log.router import router as student_attendance_log_router
 from src.students.accelerate.process_attendance.router import router as accelerate_attendance_record_router
+from src.students.accelerate.check_activity.router import router as accelerate_activity_check_router
 from src.students.missing_students.router import router as student_recover_attendance_router
 from src.students.attendance_entry.router import router as student_attendance_entry_router
 from src.students.withdrawal_processing.router import router as student_withdrawal_router
@@ -54,6 +55,13 @@ api_router.include_router(
 api_router.include_router(
     accelerate_attendance_record_router,
     prefix="/students/accelerate/process-attendance",
+    tags=["Accelerate"],
+)
+
+# /api/students/accelerate/check-activity
+api_router.include_router(
+    accelerate_activity_check_router,
+    prefix="/students/accelerate/check-activity",
     tags=["Accelerate"],
 )
 
