@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     cti_mongo_url: Optional[str] = Field(validation_alias="CTI_MONGO_URL", default=None)
     cti_postgres_url: Optional[str] = Field(validation_alias="CTI_POSTGRES_URL", default=None)
 
+    # Alembic / Migration Database URLs
+    dev_database_url: Optional[str] = Field(validation_alias="DEV_DATABASE_URL", default=None)
+    prod_database_url: Optional[str] = Field(validation_alias="PROD_DATABASE_URL", default=None)
+    custom_database_url: Optional[str] = Field(validation_alias="CUSTOM_DATABASE_URL", default=None)
+
     # Canvas Variables, only required for Canvas specific-operations
     # NOTE: SIS ID's are needed for SIS operations, must be manually defined ahead of time
     # TODO: Rename CTI_ACCESS_TOKEN to CTI_CANVAS_TOKEN, improve clarity on token purpose and differentiate from server token
@@ -45,6 +50,14 @@ class Settings(BaseSettings):
     gs_private_key: Optional[str] = Field(validation_alias="GS_PRIVATE_KEY", default=None)
     gs_private_key_id: Optional[str] = Field(validation_alias="GS_PRIVATE_KEY_ID", default=None)
     gs_project_id: Optional[str] = Field(validation_alias="GS_PROJECT_ID", default=None)
+
+    # Thresholds in weeks for determining if a student is active
+    activity_attendance_threshold_weeks: int = Field(validation_alias="ACTIVITY_ATTENDANCE_THRESHOLD_WEEKS",
+                                                     default=2,
+                                                     description="Number of weeks to check for attendance activity")
+    activity_canvas_threshold_weeks: int = Field(validation_alias="ACTIVITY_CANVAS_THRESHOLD_WEEKS",
+                                                 default=2,
+                                                 description="Number of weeks to check for Canvas activity")
 
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"

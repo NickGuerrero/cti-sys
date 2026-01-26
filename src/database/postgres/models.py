@@ -171,6 +171,7 @@ class AccelerateCourseProgress(Base):
     latest_milestone: Mapped[Optional[str]] = mapped_column(String)
     pathway_score: Mapped[Optional[float]] = mapped_column(Float(3))
     pathway_difference: Mapped[Optional[int]] = mapped_column(Integer)
+    last_canvas_access: Mapped[Optional[datetime]] = mapped_column(DateTime)
     owner: Mapped["Accelerate"] = relationship(back_populates="progress_record")
 
 class AccountabilityGroup(Base):
