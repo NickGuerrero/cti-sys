@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     activity_canvas_threshold_weeks: int = Field(validation_alias="ACTIVITY_CANVAS_THRESHOLD_WEEKS",
                                                  default=2,
                                                  description="Number of weeks to check for Canvas activity")
+    
+    # Group Attendance (gsheet/refresh/group-attendance) default lookback days
+    default_attendance_lookback_days: int = Field(validation_alias="DEFAULT_ATTENDANCE_LOOKBACK_DAYS",
+                                                  default=14,
+                                                  description="Default lookback window (in days) for group attendance exports",)
 
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
