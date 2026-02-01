@@ -1,10 +1,9 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from os import environ
 import gspread
-from datetime import date, timedelta
 
 from src.config import settings
 from src.database.postgres.core import make_session

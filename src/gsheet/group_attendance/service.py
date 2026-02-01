@@ -1,8 +1,5 @@
-from fastapi import HTTPException
-from sqlalchemy import select, func, cast, and_, Date
-from sqlalchemy.orm import Session
+from sqlalchemy import select, cast, and_, Date
 from sqlalchemy.engine import Engine
-from sqlalchemy.dialects.postgresql import array_agg
 
 from src.database.postgres.models import Attendance, StudentAttendance, StudentEmail
 import gspread
@@ -10,7 +7,6 @@ import pandas
 import numpy as np
 from typing import List, Dict
 from datetime import date
-from src.config import settings
 
 def fetch_group_attendance(eng: Engine, start_date: date, end_date: date, cti_ids: Dict[int, str]):
     """
