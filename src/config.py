@@ -60,9 +60,11 @@ class Settings(BaseSettings):
                                                  description="Number of weeks to check for Canvas activity")
 
 
-    # Canvas API Rate Limiting (10 requests per second by default)
-    canvas_rate_limit_per_second: float = Field(validation_alias="CANVAS_RATE_LIMIT_PER_SECOND", default=10.0)
-    
+    # API Rate Limits
+    canvas_rate_limit_per_second: int = Field(validation_alias="CANVAS_RATE_LIMIT_PER_SECOND", default=10)
+    sendgrid_rate_limit_per_second: int = Field(validation_alias="SENDGRID_RATE_LIMIT_PER_SECOND", default=5)
+    google_rate_limit_per_second: int = Field(validation_alias="GOOGLE_RATE_LIMIT_PER_SECOND", default=5)
+
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"

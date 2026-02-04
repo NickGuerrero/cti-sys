@@ -1,7 +1,7 @@
 """
 Canvas API Client with rate limiting.
 
-Uses requests-ratelimiter which uses leaky bucket algorithm (same as Canvas)
+Uses requests ratelimiter which uses leaky bucket algorithm (same as Canvas)
 that automatically delays requests to stay within rate limits.
 
 Canvas Rate Limits:

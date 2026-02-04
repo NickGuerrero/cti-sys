@@ -3,11 +3,11 @@ Minor stress test for Canvas API rate limiting.
 
 Run from project root:
 
-    python -m src.utils.rate_limiting.canvas_minor_stress_testing
+    python -m src.utils.rate_limiting.canvas.canvas_minor_stress_testing
 
 """
 
-from src.utils.rate_limiting.canvas_api import CanvasClient
+from src.utils.rate_limiting.canvas.canvas_api import CanvasClient
 import time
 
 REQUEST_COUNT = 25
@@ -20,7 +20,7 @@ print(f"Status: {response.status_code}")
 print(f"User: {response.json().get('name')}\n")
 
 # Test rate limiting is active
-print(f"Sending {REQUEST_COUNT} requests...")
+print(f"Sending {REQUEST_COUNT} requests:")
 start = time.time()
 for i in range(REQUEST_COUNT):
     client.get("users/self")
