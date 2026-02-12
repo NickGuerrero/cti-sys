@@ -12,7 +12,7 @@ import time
 from src.config import settings
 
 REQUEST_COUNT = 15
-TEST_SHEET_KEY = "17gjWh6YdrrX5r_ci9kF6COFSzxehKt53nMZPG5uTdp0"
+TEST_SHEET_KEY = settings.test_sheet_key
 CREDENTIALS_FILE = "gspread_credentials.json"
 
 client = GoogleSheetsClient(credentials_file=CREDENTIALS_FILE)
