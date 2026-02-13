@@ -43,6 +43,7 @@ class Student(Base):
     gender: Mapped[Optional[str]] = mapped_column(String)
     first_gen: Mapped[Optional[bool]] = mapped_column(Boolean)
     institution: Mapped[Optional[str]] = mapped_column(String)
+    academic_year: Mapped[Optional[int]] = mapped_column(Integer)
     is_graduate: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     birthday: Mapped[Optional[date]] = mapped_column(Date) # If null, assume student is at least 18
     active: Mapped[bool] = mapped_column(Boolean, default=True)
