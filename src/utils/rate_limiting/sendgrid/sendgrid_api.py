@@ -25,26 +25,21 @@ class SendGridRateLimitError(Exception):
 class SendGridClient:
     """Rate limited client for SendGrid API requests."""
     
-    def __init__(
-        self,
-        api_key: str = None,
-        sender_email: str = None,
-        rate_per_second: int = None,
-        retry_interval: float = 0.1,
-        max_wait_seconds: float = 30.0,
-        max_retries: int = 3,
-        backoff_base: int = 2,
-    ):
-        self.api_key = api_key or settings.sendgrid_api_key
-        self.sender_email = sender_email or settings.sendgrid_sender
-        self.client = SendGridAPIClient(self.api_key)
-        self.retry_interval = retry_interval
-        self.max_wait_seconds = max_wait_seconds
-        self.max_retries = max_retries
-        self.backoff_base = backoff_base
-        rate = rate_per_second or settings.sendgrid_rate_limit_per_second
-        self.limiter = Limiter(RequestRate(int(rate), Duration.SECOND))
+    def __init__(self):
+        if not settings.sendgrid_api_key:
+            raise ValueError("Missing SENDGRID_API_KEY in environment")
+        if not settings.sendgrid_sender:
+            raise ValueError("Missing SENDGRID_SENDER in environment")
     
+        self.api_key = settings.sendgrid_api_key
+        self.sender_email = settings.sendgrid_sender
+        self.client = SendGridAPIClient(self.api_key)
+        self.retry_interval = settings.rate_limit_retry_interval
+        self.max_wait_seconds = settings.rate_limit_max_wait_seconds
+        self.max_retries = settings.rate_limit_max_retries
+        self.backoff_base = settings.rate_limit_backoff_base
+        self.limiter = Limiter(RequestRate(max(settings.sendgrid_rate_limit_per_second, 1), Duration.SECOND))
+        
     def acquire(self):
         """Acquire rate limit slot and waiting if necessary."""
         start_time = time.time()
@@ -64,20 +59,12 @@ class SendGridClient:
         """Check if error is a rate limit response."""
         return error.status_code == 429
     
-    def send_email(self, to_email: str, subject: str, html_content: str) -> None:
-        """Send a rate limited email via SendGrid with retry on rate limit errors."""
-        message = Mail(
-            from_email=self.sender_email,
-            to_emails=to_email,
-            subject=subject,
-            html_content=html_content,
-        )
-        
+    def request_with_retry(self, func, *args, **kwargs):
+        """Retry on rate limit errors."""
         for attempt in range(self.max_retries + 1):
             self.acquire()
             try:
-                self.client.send(message)
-                return
+                return func(*args, **kwargs)
             except HTTPError as e:
                 if not self.is_rate_limited(e):
                     raise
@@ -88,6 +75,15 @@ class SendGridClient:
             f"Rate limit exceeded after {self.max_retries} retries"
         )
 
+    def send_email(self, to_email: str, subject: str, html_content: str) -> None:
+        """Send a rate limited email via SendGrid with retry on rate limit errors."""
+        message = Mail(
+            from_email=self.sender_email,
+            to_emails=to_email,
+            subject=subject,
+            html_content=html_content,
+        )
+        self.request_with_retry(self.client.send, message)
 
 # Default client instance
 sendgrid_client = SendGridClient()

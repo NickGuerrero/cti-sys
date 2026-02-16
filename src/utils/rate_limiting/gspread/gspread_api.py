@@ -29,24 +29,15 @@ class GoogleSheetsRateLimitError(Exception):
 class GoogleSheetsClient:
     """Rate limited client for Google Sheets API requests."""
     
-    def __init__(
-        self,
-        credentials_file: Optional[str] = None,
-        rate_per_second: int = None,
-        retry_interval: float = 0.1,
-        max_wait_seconds: float = 30.0,
-        max_retries: int = 3,
-        backoff_base: int = 2,
-    ):
+    def __init__(self, credentials_file: Optional[str] = None):
         self.credentials_file = credentials_file
         self.gc = None
-        self.retry_interval = retry_interval
-        self.max_wait_seconds = max_wait_seconds
-        self.max_retries = max_retries
-        self.backoff_base = backoff_base
-        rate = rate_per_second or settings.google_rate_limit_per_second
-        self.limiter = Limiter(RequestRate(int(max(rate, 1)), Duration.SECOND))
-    
+        self.retry_interval = settings.rate_limit_retry_interval
+        self.max_wait_seconds = settings.rate_limit_max_wait_seconds
+        self.max_retries = settings.rate_limit_max_retries
+        self.backoff_base = settings.rate_limit_backoff_base
+        self.limiter = Limiter(RequestRate(max(settings.google_rate_limit_per_second, 1), Duration.SECOND))
+        
     def acquire(self):
         """Acquire rate limit slot, waiting if necessary."""
         start_time = time.time()
@@ -108,7 +99,7 @@ class GoogleSheetsClient:
         """Write a pandas dataframe to a Google Sheet with rate limiting and retry."""
         spreadsheet = self.request_with_retry(self.get_client().open_by_key, sheet_key)
         worksheet = self.request_with_retry(spreadsheet.worksheet, worksheet_name)
-        self.request_with_retry(worksheet.update,[data.columns.values.tolist()] + data.values.tolist())
+        self.request_with_retry(worksheet.update, [data.columns.values.tolist()] + data.values.tolist())
         
         return {
             "success": True,

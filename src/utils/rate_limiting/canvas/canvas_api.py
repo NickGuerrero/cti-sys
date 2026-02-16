@@ -23,12 +23,16 @@ class CanvasRateLimitError(Exception):
 class CanvasClient:
     """Rate-limited client for Canvas API requests."""
     
-    def __init__( self, base_url: Optional[str] = None, access_token: Optional[str] = None, max_retries: int = 3):
-        self.base_url = (base_url or settings.canvas_api_test_url).rstrip("/")
-        self.access_token = access_token or settings.cti_access_token
-        self.max_retries = max_retries
+    def __init__(self):
+        if not settings.cti_access_token:
+            raise ValueError("Missing CTI_ACCESS_TOKEN in environment")
+        
+        self.base_url = settings.canvas_api_test_url.rstrip("/")
+        self.access_token = settings.cti_access_token
+        self.max_retries = settings.rate_limit_max_retries
+        self.backoff_base = settings.rate_limit_backoff_base
         self.session = LimiterSession(per_second=settings.canvas_rate_limit_per_second)
-    
+        
     def request(
         self,
         method: str,
@@ -57,7 +61,7 @@ class CanvasClient:
                 return response
             
             if attempt < self.max_retries:
-                time.sleep(2 ** attempt)
+                time.sleep(self.backoff_base ** attempt)
         
         raise CanvasRateLimitError(
             f"Rate limit exceeded after {self.max_retries} retries: {response.text}"
