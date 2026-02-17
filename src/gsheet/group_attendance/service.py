@@ -4,7 +4,6 @@ from sqlalchemy.engine import Engine
 from src.database.postgres.models import Attendance, StudentAttendance, StudentEmail
 import gspread
 import pandas
-import numpy as np
 from typing import List, Dict
 from datetime import date
 
@@ -20,57 +19,100 @@ def fetch_group_attendance(eng: Engine, start_date: date, end_date: date, cti_id
     # 1) Build cti_id -> email mapping, defaulting to "NOT FOUND"
     id_to_email = fetch_cti_emails(eng, cti_ids)
 
-    # 2) Build base CTI/email frame
-    cti_data = pandas.DataFrame(
-        [{"cti_id": cid, "email": id_to_email.get(cid, "NOT FOUND")} for cid in cti_ids]
-    ).set_index("cti_id")
+    # 2) Get all sessions in date range (even if no one attended)
+    sessions_query = (
+        select(
+            Attendance.session_id,
+            cast(Attendance.session_start, Date).label("session_date"),
+        )
+        .where(
+            cast(Attendance.session_start, Date).between(start_date, end_date)
+        )
+    )
+    sessions_frame = pandas.read_sql(sessions_query, eng)
 
-    # 3) Build date columns
-    dates = pandas.date_range(start_date, end_date)
-    date_grid = np.zeros((len(cti_ids), len(dates)), dtype=bool)
-    pandas_grid = pandas.DataFrame(date_grid, index=cti_data.index, columns=dates)
+    # If there are no sessions in this range, just return cti_id + email
+    if sessions_frame.empty:
+        final_df = pandas.DataFrame(
+            [{"cti_id": cid, "email": id_to_email.get(cid, "NOT FOUND")} for cid in cti_ids]
+        )
+        final_df = final_df.astype(str)
+        final_df.index = range(len(final_df))
+        return final_df
 
-    result_grid = pandas.concat([cti_data, pandas_grid], axis=1)
+    sessions_frame["session_date"] = pandas.to_datetime(
+        sessions_frame["session_date"]
+    ).dt.date
 
-    # 4) Fetch attendance for those CTI IDs and date range
+    # 3) Build session_id -> column_name mapping (enumerate per date)
+    by_date = (
+        sessions_frame[["session_id", "session_date"]]
+        .drop_duplicates()
+        .sort_values(["session_date", "session_id"])
+    )
+
+    session_cols: Dict[int, str] = {}
+    col_order: List[str] = []
+
+    for session_date, group in by_date.groupby("session_date", sort=True):
+        group = group.sort_values("session_id")
+        if len(group) == 1:
+            col_name = session_date.strftime("%Y-%m-%d")
+            sid = group["session_id"].iloc[0]
+            session_cols[sid] = col_name
+            col_order.append(col_name)
+        else:
+            for idx, sid in enumerate(group["session_id"], start=1):
+                col_name = f"{session_date.strftime('%Y-%m-%d')} - {idx}"
+                session_cols[sid] = col_name
+                col_order.append(col_name)
+
+    # 4) Build the full result grid (all False by default)
+    result_grid = pandas.DataFrame(
+        index=pandas.Index(cti_ids, name="cti_id"),
+        columns=col_order,
+        data=False,
+    )
+
+    # 5) Attendance rows (only present rows = attended)
     attendance_query = (
         select(
             StudentAttendance.cti_id,
+            Attendance.session_id,
             cast(Attendance.session_start, Date).label("session_date"),
         )
         .join(Attendance, Attendance.session_id == StudentAttendance.session_id)
         .where(
-            and_(StudentAttendance.cti_id.in_(cti_ids),
-                 cast(Attendance.session_start, Date).between(start_date, end_date),
+            and_(
+                StudentAttendance.cti_id.in_(cti_ids),
+                cast(Attendance.session_start, Date).between(start_date, end_date),
             )
         )
     )
-
-    print(attendance_query)
-
     attendance_frame = pandas.read_sql(attendance_query, eng)
-    print(attendance_frame)
+
+    # Mark True where they attended
     if not attendance_frame.empty:
-        attendance_frame["session_date"] = pandas.to_datetime(attendance_frame["session_date"])
+        attendance_frame["col_name"] = attendance_frame["session_id"].map(session_cols)
+        attendance_frame = attendance_frame.dropna(subset=["col_name"])
 
         for row in attendance_frame.itertuples(index=False):
-            if row.cti_id in result_grid.index and row.session_date in result_grid.columns:
-                result_grid.loc[row.cti_id, row.session_date] = True
+            cid = row.cti_id
+            col = row.col_name
+            if cid in result_grid.index and col in result_grid.columns:
+                result_grid.at[cid, col] = True
 
-    # From here on, ALWAYS normalize before returning
-    final_df = result_grid.reset_index()
+    # 6) Attach email and cti_id as first columns
+    result_grid.insert(
+        0,
+        "email",
+        [id_to_email.get(cid, "NOT FOUND") for cid in result_grid.index],
+    )
+    result_grid.insert(0, "cti_id", result_grid.index)
 
-    # Normalize headers
-    final_df.columns = [
-        col.strftime("%Y-%m-%d") if hasattr(col, "strftime") else str(col)
-        for col in final_df.columns
-    ]
-
-    # Simple integer index
-    final_df.index = range(len(final_df))
-
-    # Everything as string so gspread/JSON is happy
-    final_df = final_df.astype(str)
+    # 7) Final form
+    final_df = result_grid.reset_index(drop=True)
+    final_df = final_df.astype(str)  # for gspread
 
     return final_df
 
