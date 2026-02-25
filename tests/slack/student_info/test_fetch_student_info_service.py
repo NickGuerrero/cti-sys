@@ -24,7 +24,9 @@ class TestFetchStudentInfo:
             'ethnicities_agg': ['Hispanic', 'Asian'],
             'birthday': date(2004, 5, 15),
             'first_gen': True,
-            'email': 'john.doe@example.com'
+            'email': 'john.doe@example.com',
+            'primary_email': 'john.doe@example.com',
+            'alternate_emails': ['john.alt@example.com', 'john.doe.alt@example.com']
         }
 
     def test_fetch_student_info_success(self, mock_postgresql_db, student_row_data):
