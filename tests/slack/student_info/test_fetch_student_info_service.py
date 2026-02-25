@@ -255,3 +255,14 @@ class TestFetchStudentInfo:
             fetch_student_info(mock_postgresql_db, test_email)
 
         assert test_email in exc_info.value.detail
+
+    def test_fetch_student_info_without_alternate_emails(self, mock_postgresql_db, student_row_data):
+        """Test handling when there are no alternate emails."""
+        student_row_data['alternate_emails'] = []
+        mock_result = Mock()
+        mock_result._asdict.return_value = student_row_data
+        mock_postgresql_db.execute.return_value.first.return_value = mock_result
+
+        result = fetch_student_info(mock_postgresql_db, 'john.doe@example.com')
+
+        assert result['alternate_emails'] == []

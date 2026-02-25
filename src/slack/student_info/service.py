@@ -36,8 +36,6 @@ def fetch_student_info(db: Session, user_email: str):
     )
     result = db.execute(select_stmt).first()
 
-    print(result._asdict())
-
     if result is None:
         raise HTTPException(status_code=404, detail=f"No student records found for email {user_email}")
     
