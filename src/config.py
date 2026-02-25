@@ -59,6 +59,19 @@ class Settings(BaseSettings):
                                                  default=2,
                                                  description="Number of weeks to check for Canvas activity")
 
+
+    # API Rate Limits
+    canvas_rate_limit_per_second: int = Field(validation_alias="CANVAS_RATE_LIMIT_PER_SECOND", default=10)
+    sendgrid_rate_limit_per_second: int = Field(validation_alias="SENDGRID_RATE_LIMIT_PER_SECOND", default=5)
+    google_rate_limit_per_second: int = Field(validation_alias="GOOGLE_RATE_LIMIT_PER_SECOND", default=5)
+
+    # API Rate Limit Retry Settings
+    rate_limit_retry_interval: float = Field(validation_alias="RATE_LIMIT_RETRY_INTERVAL", default=0.1)
+    rate_limit_max_wait_seconds: float = Field(validation_alias="RATE_LIMIT_MAX_WAIT_SECONDS", default=30.0)
+    rate_limit_max_retries: int = Field(validation_alias="RATE_LIMIT_MAX_RETRIES", default=3)
+    rate_limit_backoff_base: int = Field(validation_alias="RATE_LIMIT_BACKOFF_BASE", default=2)
+
+
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"

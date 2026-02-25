@@ -12,6 +12,8 @@ from src.database.postgres.models import (
     CanvasID, StudentAttendance, Attendance
 )
 
+from src.utils.rate_limiting.canvas.canvas_api import canvas_client
+
 
 def get_current_pacific_time() -> datetime:
     """Get current time in Pacific timezone as naive datetime."""
@@ -24,14 +26,7 @@ def fetch_canvas_last_login(canvas_id: int) -> Optional[datetime]:
     if not settings.cti_access_token:
         raise ValueError("Missing Canvas API configuration (CTI_ACCESS_TOKEN)")
     
-    url = f"{settings.canvas_api_test_url}/api/v1/users/{canvas_id}"
-    
-    response = requests.get(
-        url,
-        params={"include[]": "last_login"},
-        headers={"Authorization": f"Bearer {settings.cti_access_token}"},
-        timeout=10,
-    )
+    response = canvas_client.get(f"/users/{canvas_id}", params={"include[]": "last_login"})
     
     if response.status_code == 404:
         return None
@@ -43,7 +38,6 @@ def fetch_canvas_last_login(canvas_id: int) -> Optional[datetime]:
         
     response.raise_for_status()
     user_data = response.json()
-    
     last_login_raw = user_data.get("last_login")
     if not last_login_raw:
         return None
