@@ -32,7 +32,7 @@ class TestGSheetGroup:
 
         cti_ids = service.fetch_cti_ids_from_sheet(settings.test_sheet_key, "Test Group", gc)
         attendance_data = service.fetch_group_attendance(CONN, date(2025, 10, 1), date(2025, 10, 15), cti_ids)
-
+        utils.write_to_gsheet(attendance_data, "Test Group", gc, settings.test_sheet_key)
         # Note that modifying the test sheet during the test will break the assertion
         assert output_df.shape == attendance_data.shape
         return
@@ -60,6 +60,7 @@ class TestGSheetGroup:
 
         cti_ids = service.fetch_cti_ids_from_sheet(settings.test_sheet_key, "Test Group", gc)
         attendance_data = service.fetch_group_attendance(CONN, start_date, end_date, cti_ids)
+        utils.write_to_gsheet(attendance_data, "Test Group", gc, settings.test_sheet_key)
 
         # Note that modifying the test sheet during the test will break the assertion
         assert output_df.shape == attendance_data.shape

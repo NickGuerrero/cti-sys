@@ -12,6 +12,8 @@ def fetch_group_attendance(eng: Engine, start_date: date, end_date: date, cti_id
     Fetch attendance records and create an attendance matrix of select cti_ids and a date range,
     given the associated Accelerate tables
     @param eng: A SQLAlchemy Engine object that connects to the database
+    @param start_date and end_date: Starting and ending datetime object for lookup interval.
+    @param cti_ids: A dictionary of select
     """
     if not cti_ids:
         return pandas.DataFrame(columns=["cti_id", "email"])
@@ -141,7 +143,8 @@ def fetch_cti_ids_from_sheet(spreadsheet_id: str, worksheet_name: str, gc: gspre
                 # Skip
                 continue
     
-    worksheet.clear()
+    # Clear everything except the first 2 rows
+    worksheet.batch_clear(['C:ZZ'])
     
     return data
 
