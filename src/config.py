@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     rate_limit_max_retries: int = Field(validation_alias="RATE_LIMIT_MAX_RETRIES", default=3)
     rate_limit_backoff_base: int = Field(validation_alias="RATE_LIMIT_BACKOFF_BASE", default=2)
 
+    # Parchment Digital Badges
+    parchment_email: Optional[str] = Field(validation_alias="PARCHMENT_EMAIL", default=None)
+    parchment_password: Optional[str] = Field(validation_alias="PARCHMENT_PASSWORD", default=None)
+    parchment_api_url: str = "https://api.badges.parchment.com"
+    parchment_rate_limit_per_second: int = Field(validation_alias="PARCHMENT_RATE_LIMIT_PER_SECOND", default=10)
 
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
