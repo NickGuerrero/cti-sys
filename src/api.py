@@ -10,6 +10,7 @@ from src.students.accelerate.check_activity.router import router as accelerate_a
 from src.students.missing_students.router import router as student_recover_attendance_router
 from src.students.attendance_entry.router import router as student_attendance_entry_router
 from src.students.withdrawal_processing.router import router as student_withdrawal_router
+from src.slack.student_info.router import router as student_info_router
 
 from src.gsheet.refresh.router import router as gsheet_refresh_router
 from src.utils.authorization import verify_api_key
@@ -91,4 +92,10 @@ api_router.include_router(
     gsheet_refresh_router,
     prefix="/gsheet/refresh",
     tags=["GSheet"],
+)
+
+api_router.include_router(
+    student_info_router,
+    prefix="/slack/students/info",
+    tags=["Slack"],
 )
