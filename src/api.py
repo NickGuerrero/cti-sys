@@ -97,5 +97,5 @@ api_router.include_router(
 api_router.include_router(
     student_info_router,
     prefix="/slack/students/info",
-    tags=["Stack"],
+    tags=["Slack"],
 )
