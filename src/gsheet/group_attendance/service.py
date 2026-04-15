@@ -143,7 +143,7 @@ def fetch_cti_ids_from_sheet(spreadsheet_id: str, worksheet_name: str, gc: gspre
                 # Skip
                 continue
     
-    # Clear everything except the first 2 rows
+    # Clear everything except the first 2 columns
     worksheet.batch_clear(['C:ZZ'])
     
     return data
