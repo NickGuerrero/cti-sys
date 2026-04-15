@@ -1,11 +1,15 @@
 """
 Minor stress test for Canvas API rate limiting.
 
-Run from project root:
+Run test:
 
-    python -m src.utils.rate_limiting.canvas.canvas_minor_stress_testing
+    python rate_limit_testing/canvas_minor_stress_testing.py
 
 """
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.utils.rate_limiting.canvas.canvas_api import CanvasClient
 import time

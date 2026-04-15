@@ -1,11 +1,15 @@
 """
 Minor stress test for SendGrid API rate limiting.
 
-Run from project root:
+Run test:
 
-    python -m src.utils.rate_limiting.sendgrid.sendgrid_minor_stress_testing
+    python rate_limit_testing/sendgrid_minor_stress_testing.py
 
 """
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.utils.rate_limiting.sendgrid.sendgrid_api import SendGridClient
 from src.config import settings

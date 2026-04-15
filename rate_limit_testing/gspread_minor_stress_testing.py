@@ -1,15 +1,19 @@
 """
 Minor stress test for Google Sheets API rate limiting.
 
-Run from project root:
+Run test:
 
-    python -m src.utils.rate_limiting.gspread.gspread_minor_stress_testing
+    python rate_limit_testing/gspread_minor_stress_testing.py
 
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from src.utils.rate_limiting.gspread.gspread_api import GoogleSheetsClient
-import time
 from src.config import settings
+import time
 
 REQUEST_COUNT = 15
 TEST_SHEET_KEY = settings.test_sheet_key
