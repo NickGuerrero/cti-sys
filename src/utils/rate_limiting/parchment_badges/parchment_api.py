@@ -181,3 +181,28 @@ class ParchmentClient:
         self.access_token = None
         self.ensure_authenticated()
         return {"Authorization": f"Bearer {self.access_token}"}
+    
+    def get_all_badges(self) -> list[dict]:
+        """
+        Fetch all badge classes from Parchment for CTI's issuer account.
+
+        Handles pagination automatically, collecting all badges across
+        all pages before returning.
+        """
+        if not settings.parchment_issuer_id:
+            raise ValueError("Missing PARCHMENT_ISSUER_ID in environment")
+
+        endpoint = f"/v2/issuers/{settings.parchment_issuer_id}/badgeclasses"
+        badges = []
+
+        while endpoint:
+            response = self.get(endpoint)
+            response.raise_for_status()
+
+            data = response.json()
+            result = data.get("result", [])
+            badges.extend(result)
+
+            endpoint = data.get("nextPageUrl", None)
+
+        return badges
