@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     parchment_password: Optional[str] = Field(validation_alias="PARCHMENT_PASSWORD", default=None)
     parchment_api_url: str = "https://api.badges.parchment.com"
     parchment_rate_limit_per_second: int = Field(validation_alias="PARCHMENT_RATE_LIMIT_PER_SECOND", default=10)
+    parchment_issuer_id: Optional[str] = Field(validation_alias="PARCHMENT_ISSUER_ID", default=None)
 
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
