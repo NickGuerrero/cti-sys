@@ -241,7 +241,7 @@ collections: dict[str, CollectionProps] = {
                     "description": "Must include the badge description as a string value"
                 },
             },
-            "additionalProperties": False
+            "additionalProperties": True
         },
         indexes=[
             IndexModel("parchment_id", unique=True),
@@ -318,7 +318,7 @@ collections: dict[str, CollectionProps] = {
                     }
                 },
             },
-            "additionalProperties": False
+            "additionalProperties": True
         },
         indexes=[
             IndexModel("cti_id"),
