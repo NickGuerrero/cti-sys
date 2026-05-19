@@ -26,11 +26,12 @@ class TestCheckAccelerateActivity:
         
         # Mock attendance check to return True - student HAS attended sessions
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         # Mock Canvas activity check to also return True with a recent login
         pacific_tz = pytz.timezone('America/Los_Angeles')
         last_login = datetime.now(pacific_tz).replace(tzinfo=None) - timedelta(hours=3)
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (True, last_login))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (True, last_login))
         
         def mock_filter_side_effect(*args, **kwargs):
             mock_result = MagicMock()
@@ -81,9 +82,10 @@ class TestCheckAccelerateActivity:
         
         # Mock attendance check to return True - student HAS attended sessions
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         # Mock Canvas check to return False - NO Canvas activity
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (False, None))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (False, None))
         
         def mock_filter_side_effect(*args, **kwargs):
             mock_result = MagicMock()
@@ -132,11 +134,12 @@ class TestCheckAccelerateActivity:
         
         # Mock attendance check to return False - NO attendance
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: False)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         # Mock Canvas check to return True with recent login
         pacific_tz = pytz.timezone('America/Los_Angeles')
         last_login = datetime.now(pacific_tz).replace(tzinfo=None) - timedelta(hours=6)
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (True, last_login))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (True, last_login))
         
         def mock_filter_side_effect(*args, **kwargs):
             mock_result = MagicMock()
@@ -186,9 +189,10 @@ class TestCheckAccelerateActivity:
         
         # Mock attendance check to return False - NO attendance
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: False)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         # Mock Canvas check to return False - NO Canvas activity
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (False, None))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (False, None))
         
         def mock_filter_side_effect(*args, **kwargs):
             mock_result = MagicMock()
@@ -218,8 +222,9 @@ class TestCheckAccelerateActivity:
         assert acc.active == False
     
     
-    def test_no_active_students(self, client, mock_postgresql_db):
+    def test_no_active_students(self, client, monkeypatch, mock_postgresql_db):
         """Test case where no active students are found."""
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
         mock_query = MagicMock()
         mock_query.join.return_value.filter.return_value.all.return_value = []
         mock_postgresql_db.query.return_value = mock_query
@@ -262,12 +267,13 @@ class TestCheckAccelerateActivity:
         acc_2.active = False
         
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
-        def mock_check_canvas(db, cti_id, threshold):
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
+        def mock_check_canvas(db, cti_id, threshold, canvas):
             if cti_id == 3001:
                 raise ValueError("Canvas API authentication failed")
             return False, None
-        
+
         monkeypatch.setattr(svc, "check_canvas", mock_check_canvas)
         
         def mock_filter_side_effect(*args, **kwargs):
@@ -308,10 +314,11 @@ class TestCheckAccelerateActivity:
         acc.active = False
         
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         pacific_tz = pytz.timezone('America/Los_Angeles')
         last_login = datetime.now(pacific_tz).replace(tzinfo=None)
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (True, last_login))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (True, last_login))
         
         added_records = []
         
@@ -355,9 +362,10 @@ class TestCheckAccelerateActivity:
         existing_progress.last_canvas_access = old_login
         
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         new_login = datetime.now(pacific_tz).replace(tzinfo=None) - timedelta(hours=2)
-        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold: (True, new_login))
+        monkeypatch.setattr(svc, "check_canvas", lambda db, cti_id, threshold, canvas: (True, new_login))
         
         added_records = []
         
@@ -399,7 +407,8 @@ class TestCheckAccelerateActivity:
         acc.active = True
         
         monkeypatch.setattr(svc, "check_attendance", lambda db, cti_id, threshold: True)
-        
+        monkeypatch.setattr(svc, "CanvasClient", MagicMock())
+
         def mock_query_side_effect(model):
             mock_result = MagicMock()
             mock_result.join.return_value.filter.return_value.all.return_value = [student]

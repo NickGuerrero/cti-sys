@@ -1,18 +1,16 @@
 import json
-from os import environ
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson import json_util
 
-from src.config import MONGO_DATABASE_NAME
+from src.config import settings, MONGO_DATABASE_NAME
 from src.database.mongo.service import init_collections
 
-MONGO_URL = environ.get("CTI_MONGO_URL")
-if not MONGO_URL:
+if not settings.cti_mongo_url:
     raise ValueError("MongoDB URL environment variable not found")
 
 # Create a new client and connect to the server
-client = MongoClient(MONGO_URL, server_api=ServerApi('1'))
+client = MongoClient(settings.cti_mongo_url, server_api=ServerApi('1'))
 
 # Send a ping to confirm a successful connection
 def ping_mongo(client: MongoClient):
