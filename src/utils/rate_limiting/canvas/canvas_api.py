@@ -27,11 +27,7 @@ class CanvasClient:
         if not settings.cti_access_token:
             raise ValueError("Missing CTI_ACCESS_TOKEN in environment")
         
-        if settings.app_env == "production":
-            self.base_url = settings.canvas_api_url
-        else:
-            self.base_url = settings.canvas_api_test_url
-
+        self.base_url = settings.canvas_api_url
         self.access_token = settings.cti_access_token
         self.max_retries = settings.rate_limit_max_retries
         self.backoff_base = settings.rate_limit_backoff_base
@@ -171,5 +167,3 @@ class CanvasClient:
 
         return progress_map
 
-# Default client instance
-canvas_client = CanvasClient()

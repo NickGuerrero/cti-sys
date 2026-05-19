@@ -1,18 +1,17 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from pymongo.client_session import ClientSession
+from pymongo.database import Database
 from sqlalchemy.orm import Session
 
 from src.config import BADGES_COLLECTION, STUDENT_BADGES_COLLECTION
-from src.database.mongo.core import get_mongo
 from src.database.postgres.models import CanvasID, Student
 from src.utils.rate_limiting.canvas.canvas_api import CanvasClient
 from src.utils.rate_limiting.parchment_badges.parchment_api import ParchmentClient
 
 
 def pull_badge_data(
-    mongo_session: ClientSession,
+    mongo: Database,
     db: Session,
 ) -> Dict[str, Any]:
     """
@@ -21,7 +20,6 @@ def pull_badge_data(
     For each badge linked to a Canvas course, creates or updates
     StudentBadge records for all enrolled students with their completion percentage.
     """
-    mongo = get_mongo()
     badges_collection = mongo.get_collection(BADGES_COLLECTION)
     student_badges_collection = mongo.get_collection(STUDENT_BADGES_COLLECTION)
 
@@ -52,15 +50,11 @@ def pull_badge_data(
                     "last_updated": datetime.now(timezone.utc),
                 }},
                 upsert=True,
-                session=mongo_session,
             )
             badges_synced += 1
 
             # check if this badge has a canvas_id linked manually
-            existing_badge = badges_collection.find_one(
-                {"parchment_id": parchment_id},
-                session=mongo_session,
-            )
+            existing_badge = badges_collection.find_one({"parchment_id": parchment_id})
             canvas_id = existing_badge.get("canvas_id") if existing_badge else None
 
             if canvas_id:
@@ -68,7 +62,6 @@ def pull_badge_data(
                     canvas_id=canvas_id,
                     badge=existing_badge,
                     student_badges_collection=student_badges_collection,
-                    mongo_session=mongo_session,
                     db=db,
                     canvas=canvas,
                 )
@@ -107,7 +100,6 @@ def sync_student_badges(
     canvas_id: int,
     badge: dict,
     student_badges_collection,
-    mongo_session: ClientSession,
     db: Session,
     canvas: CanvasClient,
 ) -> Tuple[int, int]:
@@ -142,8 +134,7 @@ def sync_student_badges(
         completion_percentage = progress_map.get(canvas_user_id)
 
         existing = student_badges_collection.find_one(
-            {"cti_id": cti_id, "parchment_id": badge.get("parchment_id")},
-            session=mongo_session,
+            {"cti_id": cti_id, "parchment_id": badge.get("parchment_id")}
         )
 
         if existing:
@@ -151,7 +142,6 @@ def sync_student_badges(
             student_badges_collection.update_one(
                 {"cti_id": cti_id, "parchment_id": badge.get("parchment_id")},
                 {"$set": {"completion_percentage": completion_percentage}},
-                session=mongo_session,
             )
             updated += 1
         else:
@@ -164,8 +154,7 @@ def sync_student_badges(
                     "completion_percentage": completion_percentage,
                     "date_awarded": None,
                     "artifacts": [],
-                },
-                session=mongo_session,
+                }
             )
             created += 1
 
