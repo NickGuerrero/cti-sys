@@ -47,6 +47,7 @@ def pull_badge_data(
                     "badge_name": badge.get("name"),
                     "image_url": badge.get("image"),
                     "description": badge.get("description"),
+                    "version": badge.get("version"),
                     "last_updated": datetime.now(timezone.utc),
                 }},
                 upsert=True,

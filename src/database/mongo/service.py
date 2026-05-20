@@ -236,6 +236,10 @@ collections: dict[str, CollectionProps] = {
                     "bsonType": ["date", "null"],
                     "description": "Must include the date this badge record was last synced as a UTC datetime"
                 },
+                "version": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the badge version as a string value"
+                },
                 "description": {
                     "bsonType": ["string", "null"],
                     "description": "Must include the badge description as a string value"

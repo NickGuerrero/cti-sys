@@ -27,4 +27,6 @@ def sync_badge_data(
         result = pull_badge_data(mongo=mongo, db=db)
         return result
     except Exception as exc:
+        # db.rollback() is a no-op here since there are no Postgres writes;
+        # handle_db_exceptions is used for consistency with other routers
         handle_db_exceptions(db, exc)
