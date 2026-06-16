@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
     sa_whitelist: str = "SA Whitelist"
+
+    @model_validator(mode="after")
+    def set_canvas_url_for_env(self):
+        if self.app_env == "development":
+            self.canvas_api_url = self.canvas_api_test_url
+        return self
     gsheet_write_rows_max: int = 998
 
 settings = Settings()

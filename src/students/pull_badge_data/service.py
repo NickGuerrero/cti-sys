@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from pymongo import UpdateOne
 from pymongo.database import Database
+from pymongo.errors import BulkWriteError
 from sqlalchemy.orm import Session
 
 from src.config import BADGES_COLLECTION, STUDENT_BADGES_COLLECTION
@@ -10,52 +12,75 @@ from src.utils.rate_limiting.canvas.canvas_api import CanvasClient
 from src.utils.rate_limiting.parchment_badges.parchment_api import ParchmentClient
 
 
-def pull_badge_data(
-    mongo: Database,
+def build_badge_upsert(badge: dict) -> Optional[UpdateOne]:
+    """
+    Build an UpdateOne upsert operation for a single Parchment badge.
+    """
+    parchment_id = badge.get("entityId")
+    if not parchment_id:
+        return None
+
+    return UpdateOne(
+        {"parchment_id": parchment_id},
+        {"$set": {
+            "parchment_id": parchment_id,
+            "badge_name": badge.get("name"),
+            "image_url": badge.get("image"),
+            "description": badge.get("description"),
+            "version": badge.get("version"),
+            "last_updated": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
+
+
+def process_badge_batch(
+    batch: List[dict],
+    badges_collection,
+    student_badges_collection,
     db: Session,
+    canvas: CanvasClient,
 ) -> Dict[str, Any]:
     """
-    Fetch all badge classes from Parchment and sync into MongoDB.
-
-    For each badge linked to a Canvas course, creates or updates
-    StudentBadge records for all enrolled students with their completion percentage.
+    Upsert one page of Parchment badges via bulk_write, then sync
+    student badges for any of those badges that have a canvas_id linked.
     """
-    badges_collection = mongo.get_collection(BADGES_COLLECTION)
-    student_badges_collection = mongo.get_collection(STUDENT_BADGES_COLLECTION)
-
-    parchment = ParchmentClient()
-    canvas = CanvasClient()
-
     errors: List[str] = []
     badges_synced = 0
     student_badges_created = 0
     student_badges_updated = 0
 
-    badges = parchment.get_all_badges()
+    operations: List[UpdateOne] = []
+    parchment_ids: List[str] = []
 
-    for badge in badges:
-        parchment_id = badge.get("entityId")
-        if not parchment_id:
+    for badge in batch:
+        op = build_badge_upsert(badge)
+        if op is None:
             continue
+        operations.append(op)
+        parchment_ids.append(badge["entityId"])
 
+    if operations:
         try:
-            # upsert badge class into badges collection
-            badges_collection.update_one(
-                {"parchment_id": parchment_id},
-                {"$set": {
-                    "parchment_id": parchment_id,
-                    "badge_name": badge.get("name"),
-                    "image_url": badge.get("image"),
-                    "description": badge.get("description"),
-                    "version": badge.get("version"),
-                    "last_updated": datetime.now(timezone.utc),
-                }},
-                upsert=True,
-            )
-            badges_synced += 1
+            result = badges_collection.bulk_write(operations, ordered=False)
+            badges_synced += result.upserted_count + result.matched_count
+        except BulkWriteError as bwe:
+            # Some operations in the batch may have succeeded; only report failures.
+            write_errors = bwe.details.get("writeErrors", [])
+            failed_indexes = {err["index"] for err in write_errors}
+            badges_synced += len(operations) - len(failed_indexes)
+            for err in write_errors:
+                failed_parchment_id = parchment_ids[err["index"]]
+                errors.append(f"Error processing badge {failed_parchment_id}: {err.get('errmsg')}")
 
-            # check if this badge has a canvas_id linked manually
-            existing_badge = badges_collection.find_one({"parchment_id": parchment_id})
+    stored_badges = {
+        doc["parchment_id"]: doc
+        for doc in badges_collection.find({"parchment_id": {"$in": parchment_ids}})
+    }
+
+    for parchment_id in parchment_ids:
+        try:
+            existing_badge = stored_badges.get(parchment_id)
             canvas_id = existing_badge.get("canvas_id") if existing_badge else None
 
             if canvas_id:
@@ -68,13 +93,56 @@ def pull_badge_data(
                 )
                 student_badges_created += created
                 student_badges_updated += updated
-
         except Exception as e:
             errors.append(f"Error processing badge {parchment_id}: {str(e)}")
 
     return {
+        "badges_synced": badges_synced,
+        "student_badges_created": student_badges_created,
+        "student_badges_updated": student_badges_updated,
+        "errors": errors,
+    }
+
+
+def pull_badge_data(
+    mongo: Database,
+    db: Session,
+) -> Dict[str, Any]:
+    """
+    Stream badge classes from Parchment and sync into MongoDB, one page at a time.
+    For each badge, if it has a linked canvas_id, also sync student badges for enrolled students.
+    """
+    badges_collection = mongo.get_collection(BADGES_COLLECTION)
+    student_badges_collection = mongo.get_collection(STUDENT_BADGES_COLLECTION)
+
+    parchment = ParchmentClient()
+    canvas = CanvasClient()
+
+    errors: List[str] = []
+    total_badges_from_parchment = 0
+    badges_synced = 0
+    student_badges_created = 0
+    student_badges_updated = 0
+
+    for batch in parchment.stream_badges():
+        total_badges_from_parchment += len(batch)
+
+        batch_result = process_badge_batch(
+            batch=batch,
+            badges_collection=badges_collection,
+            student_badges_collection=student_badges_collection,
+            db=db,
+            canvas=canvas,
+        )
+
+        badges_synced += batch_result["badges_synced"]
+        student_badges_created += batch_result["student_badges_created"]
+        student_badges_updated += batch_result["student_badges_updated"]
+        errors.extend(batch_result["errors"])
+
+    return {
         "status": 200,
-        "total_badges_from_parchment": len(badges),
+        "total_badges_from_parchment": total_badges_from_parchment,
         "badges_synced": badges_synced,
         "student_badges_created": student_badges_created,
         "student_badges_updated": student_badges_updated,

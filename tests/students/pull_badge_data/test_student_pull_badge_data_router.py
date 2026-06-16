@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
+
+from pymongo.errors import BulkWriteError
+
 from src.config import BADGES_COLLECTION, STUDENT_BADGES_COLLECTION
 import src.students.pull_badge_data.service as svc
 
@@ -8,10 +11,10 @@ class TestPullBadgeData:
 
     def make_parchment_badge(
         self,
-        entity_id="ajuBF97BRjG_dd7xmv5zmg",
-        name="101 Completion",
-        image="https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-        description="101 Completion",
+        entity_id="test-badge-id-001",
+        name="100 Completion",
+        image="https://example.com/badges/test-badge-id-001/image",
+        description="100 Completion",
     ):
         """Return a minimal Parchment badge dict matching the API envelope result shape."""
         return {
@@ -29,11 +32,15 @@ class TestPullBadgeData:
         }
 
     def mock_parchment(self, monkeypatch, badges):
-        """Patch ParchmentClient to return a fixed list of badges."""
+        """Patch ParchmentClient.stream_badges to yield a single page containing all given badges."""
+        def fake_stream_badges():
+            if badges:
+                yield badges
+
         monkeypatch.setattr(
             "src.students.pull_badge_data.service.ParchmentClient",
             MagicMock(return_value=MagicMock(
-                get_all_badges=MagicMock(return_value=badges)
+                stream_badges=MagicMock(return_value=fake_stream_badges())
             ))
         )
 
@@ -62,17 +69,17 @@ class TestPullBadgeData:
         assert data["errors"] == []
 
         stored = mock_mongo_db[BADGES_COLLECTION].find_one(
-            {"parchment_id": "ajuBF97BRjG_dd7xmv5zmg"}
+            {"parchment_id": "test-badge-id-001"}
         )
         assert stored is not None
-        assert stored["badge_name"] == "101 Completion"
-        assert stored["image_url"] == "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image"
-        assert stored["description"] == "101 Completion"
+        assert stored["badge_name"] == "100 Completion"
+        assert stored["image_url"] == "https://example.com/badges/test-badge-id-001/image"
+        assert stored["description"] == "100 Completion"
 
     def test_canvas_id_not_overwritten_by_sync(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """canvas_id manually set on a badge document is never overwritten by sync."""
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
+            "parchment_id": "test-badge-id-001",
             "badge_name": "Old Name",
             "image_url": "https://old.url/image",
             "description": "Old",
@@ -89,7 +96,7 @@ class TestPullBadgeData:
         assert res.status_code == 200
 
         stored = mock_mongo_db[BADGES_COLLECTION].find_one(
-            {"parchment_id": "ajuBF97BRjG_dd7xmv5zmg"}
+            {"parchment_id": "test-badge-id-001"}
         )
         assert stored["badge_name"] == "New Name"
         assert stored["image_url"] == "https://new.url/image"
@@ -109,7 +116,7 @@ class TestPullBadgeData:
     def test_multiple_badges_synced(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """Multiple badges from Parchment are all upserted correctly."""
         badges = [
-            self.make_parchment_badge(entity_id="id_1", name="101 Completion"),
+            self.make_parchment_badge(entity_id="id_1", name="100 Completion"),
             self.make_parchment_badge(entity_id="id_2", name="201 Completion"),
             self.make_parchment_badge(entity_id="id_3", name="301 Completion"),
         ]
@@ -125,10 +132,10 @@ class TestPullBadgeData:
     def test_student_badge_created_for_enrolled_student(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """A StudentBadge record is created for a student enrolled in a linked Canvas course."""
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
-            "badge_name": "101 Completion",
-            "image_url": "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-            "description": "101 Completion",
+            "parchment_id": "test-badge-id-001",
+            "badge_name": "100 Completion",
+            "image_url": "https://example.com/badges/test-badge-id-001/image",
+            "description": "100 Completion",
             "canvas_id": 170,
             "last_updated": datetime.now(timezone.utc),
         })
@@ -153,7 +160,7 @@ class TestPullBadgeData:
         stored = mock_mongo_db[STUDENT_BADGES_COLLECTION].find_one({"cti_id": 4337})
         assert stored is not None
         assert stored["student_name"] == "Jose Campos Rodriguez"
-        assert stored["parchment_id"] == "ajuBF97BRjG_dd7xmv5zmg"
+        assert stored["parchment_id"] == "test-badge-id-001"
         assert stored["completion_percentage"] == 0.2245
         assert stored["date_awarded"] is None
         assert stored["artifacts"] == []
@@ -161,16 +168,16 @@ class TestPullBadgeData:
     def test_student_badge_updated_not_duplicated(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """An existing StudentBadge is updated on re-run, not duplicated."""
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
-            "badge_name": "101 Completion",
-            "image_url": "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-            "description": "101 Completion",
+            "parchment_id": "test-badge-id-001",
+            "badge_name": "100 Completion",
+            "image_url": "https://example.com/badges/test-badge-id-001/image",
+            "description": "100 Completion",
             "canvas_id": 170,
             "last_updated": datetime.now(timezone.utc),
         })
         mock_mongo_db[STUDENT_BADGES_COLLECTION].insert_one({
             "cti_id": 4337,
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
+            "parchment_id": "test-badge-id-001",
             "student_name": "Jose Campos Rodriguez",
             "badge_info": {},
             "completion_percentage": 0.1,
@@ -196,7 +203,7 @@ class TestPullBadgeData:
         assert res.json()["student_badges_updated"] == 1
 
         count = mock_mongo_db[STUDENT_BADGES_COLLECTION].count_documents(
-            {"cti_id": 4337, "parchment_id": "ajuBF97BRjG_dd7xmv5zmg"}
+            {"cti_id": 4337, "parchment_id": "test-badge-id-001"}
         )
         assert count == 1
 
@@ -206,10 +213,10 @@ class TestPullBadgeData:
     def test_student_not_in_system_is_skipped(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """A student enrolled in Canvas but not in our system is skipped cleanly."""
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
-            "badge_name": "101 Completion",
-            "image_url": "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-            "description": "101 Completion",
+            "parchment_id": "test-badge-id-001",
+            "badge_name": "100 Completion",
+            "image_url": "https://example.com/badges/test-badge-id-001/image",
+            "description": "100 Completion",
             "canvas_id": 170,
             "last_updated": datetime.now(timezone.utc),
         })
@@ -235,16 +242,16 @@ class TestPullBadgeData:
         awarded_date = datetime(2025, 6, 1)
 
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
-            "badge_name": "101 Completion",
-            "image_url": "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-            "description": "101 Completion",
+            "parchment_id": "test-badge-id-001",
+            "badge_name": "100 Completion",
+            "image_url": "https://example.com/badges/test-badge-id-001/image",
+            "description": "100 Completion",
             "canvas_id": 170,
             "last_updated": datetime.now(timezone.utc),
         })
         mock_mongo_db[STUDENT_BADGES_COLLECTION].insert_one({
             "cti_id": 4337,
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
+            "parchment_id": "test-badge-id-001",
             "student_name": "Jose Campos Rodriguez",
             "badge_info": {},
             "completion_percentage": 1.0,
@@ -282,7 +289,7 @@ class TestPullBadgeData:
         assert mock_mongo_db[STUDENT_BADGES_COLLECTION].count_documents({}) == 0
 
     def test_error_on_one_badge_does_not_stop_others(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
-        """An error processing one badge does not prevent other badges from processing."""
+        """An error processing one badge in a bulk_write does not prevent other badges in the same batch from syncing."""
         badges = [
             self.make_parchment_badge(entity_id="bad_id", name="Bad Badge"),
             self.make_parchment_badge(entity_id="good_id", name="Good Badge"),
@@ -290,12 +297,28 @@ class TestPullBadgeData:
         self.mock_parchment(monkeypatch, badges)
         self.mock_canvas(monkeypatch)
 
-        original_update = mock_mongo_db[BADGES_COLLECTION].update_one
-        def patched_update(filter_doc, *args, **kwargs):
-            if filter_doc.get("parchment_id") == "bad_id":
-                raise Exception("Simulated DB error")
-            return original_update(filter_doc, *args, **kwargs)
-        mock_mongo_db[BADGES_COLLECTION].update_one = patched_update
+        real_bulk_write = mock_mongo_db[BADGES_COLLECTION].bulk_write
+
+        def patched_bulk_write(operations, *args, **kwargs):
+            # Run only the "good_id" operation for real, then report "bad_id" as a failure,
+            # simulating a partial bulk_write failure (ordered=False keeps other ops running).
+            good_ops = [
+                op for op in operations
+                if op._filter.get("parchment_id") != "bad_id"
+            ]
+            bad_index = next(
+                i for i, op in enumerate(operations)
+                if op._filter.get("parchment_id") == "bad_id"
+            )
+            if good_ops:
+                real_bulk_write(good_ops, *args, **kwargs)
+            raise BulkWriteError({
+                "writeErrors": [
+                    {"index": bad_index, "errmsg": "Simulated DB error"}
+                ]
+            })
+
+        mock_mongo_db[BADGES_COLLECTION].bulk_write = patched_bulk_write
 
         res = client.post("/api/students/pull-badge-data")
         assert res.status_code == 200
@@ -305,13 +328,17 @@ class TestPullBadgeData:
         assert len(data["errors"]) == 1
         assert "bad_id" in data["errors"][0]
 
+        # the good badge is still persisted even though the batch reported a failure
+        assert mock_mongo_db[BADGES_COLLECTION].find_one({"parchment_id": "good_id"}) is not None
+        assert mock_mongo_db[BADGES_COLLECTION].find_one({"parchment_id": "bad_id"}) is None
+
     def test_completion_percentage_stored_correctly(self, client, mock_mongo_db, mock_postgresql_db, monkeypatch):
         """Completion percentage from Canvas bulk progress is stored accurately."""
         mock_mongo_db[BADGES_COLLECTION].insert_one({
-            "parchment_id": "ajuBF97BRjG_dd7xmv5zmg",
-            "badge_name": "101 Completion",
-            "image_url": "https://api.badgr.io/public/badges/ajuBF97BRjG_dd7xmv5zmg/image",
-            "description": "101 Completion",
+            "parchment_id": "test-badge-id-001",
+            "badge_name": "100 Completion",
+            "image_url": "https://example.com/badges/test-badge-id-001/image",
+            "description": "100 Completion",
             "canvas_id": 170,
             "last_updated": datetime.now(timezone.utc),
         })
