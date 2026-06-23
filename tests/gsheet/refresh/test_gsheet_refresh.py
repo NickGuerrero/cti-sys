@@ -3,7 +3,6 @@ import pytest
 import pandas
 import gspread
 from datetime import datetime
-from os import environ
 
 from src.database.postgres.models import Student, StudentEmail, CanvasID, Ethnicity
 from src.main import app
@@ -23,13 +22,13 @@ class TestGSheet:
         outside the scope of this issue. If Read-Write is solved, it should be implemented.
         """
         # Note that TEST_SHEET_KEY should only ever be called and used in testing
-        monkeypatch.setenv("ROSTER_SHEET_KEY", environ.get("TEST_SHEET_KEY"))
+        monkeypatch.setenv("ROSTER_SHEET_KEY", settings.test_sheet_key)
         response = client.post("/api/gsheet/refresh/main")
         assert response.status_code == 201
 
         # Check that at least the correct number of rows were written
         gc = utils.create_credentials()
-        output_spreadsheet = gc.open_by_key(environ.get("TEST_SHEET_KEY"))
+        output_spreadsheet = gc.open_by_key(settings.test_sheet_key)
         output_worksheet = output_spreadsheet.worksheet("Main Roster")
         output_df = pandas.DataFrame(output_worksheet.get_all_records())
         roster_data = service.fetch_roster(CONN)

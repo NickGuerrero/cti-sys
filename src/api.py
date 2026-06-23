@@ -14,6 +14,7 @@ from src.slack.student_info.router import router as student_info_router
 from src.students.pull_badge_data.router import router as pull_badge_data_router
 
 from src.gsheet.refresh.router import router as gsheet_refresh_router
+from src.gsheet.group_attendance.router import router as gsheet_router
 from src.utils.authorization import verify_api_key
 
 api_router = APIRouter(dependencies=[Depends(verify_api_key)])
@@ -86,6 +87,13 @@ api_router.include_router(
     student_withdrawal_router,
     prefix="/students/process-withdrawal",
     tags=["Students"],
+)
+
+# /api/gsheet/...
+api_router.include_router(
+    gsheet_router,
+    prefix="/gsheet",
+    tags=["GSheet"],
 )
 
 # /api/gsheet/refresh/...

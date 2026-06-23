@@ -29,7 +29,7 @@ def create_credentials():
 
 
 def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str,
-                    gc: gspread.client.Client, sh: str):
+                    gc: gspread.client.Client, key: str):
     """
     Write a pandas dataframe to a Google Sheet
     
@@ -39,7 +39,7 @@ def write_to_gsheet(data: pandas.DataFrame, worksheet_name: str,
     @param sh: The Google Sheet ID (Retrieved from the URL)
     """
     # Important: Enable both Google Drive and Google Sheet API for the key
-    sh = gc.open_by_key(settings.roster_sheet_key)
+    sh = gc.open_by_key(key)
     worksheet = sh.worksheet(worksheet_name)
     worksheet.update([data.columns.values.tolist()] + data.values.tolist())
     return {
