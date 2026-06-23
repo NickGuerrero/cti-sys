@@ -14,7 +14,7 @@ Authentication:
 
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Iterator, Optional
 import requests
 from requests import Response
 from requests_ratelimiter import LimiterSession
@@ -181,3 +181,24 @@ class ParchmentClient:
         self.access_token = None
         self.ensure_authenticated()
         return {"Authorization": f"Bearer {self.access_token}"}
+    
+    def stream_badges(self) -> Iterator[list[dict]]:
+        """
+        Fetch badge classes from Parchment for CTI's issuer account, one page at a time.
+        Yields lists of badge dicts until all pages have been fetched.
+        """
+        if not settings.parchment_issuer_id:
+            raise ValueError("Missing PARCHMENT_ISSUER_ID in environment")
+
+        endpoint = f"/v2/issuers/{settings.parchment_issuer_id}/badgeclasses"
+
+        while endpoint:
+            response = self.get(endpoint)
+            response.raise_for_status()
+
+            data = response.json()
+            result = data.get("result", [])
+            if result:
+                yield result
+
+            endpoint = data.get("nextPageUrl", None)

@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -76,11 +76,18 @@ class Settings(BaseSettings):
     parchment_password: Optional[str] = Field(validation_alias="PARCHMENT_PASSWORD", default=None)
     parchment_api_url: str = "https://api.badges.parchment.com"
     parchment_rate_limit_per_second: int = Field(validation_alias="PARCHMENT_RATE_LIMIT_PER_SECOND", default=10)
+    parchment_issuer_id: Optional[str] = Field(validation_alias="PARCHMENT_ISSUER_ID", default=None)
 
     # Application Constants
     canvas_api_url: str = "https://cti-courses.instructure.com"
     canvas_api_test_url: str = "https://cti-courses.test.instructure.com"
     sa_whitelist: str = "SA Whitelist"
+
+    @model_validator(mode="after")
+    def set_canvas_url_for_env(self):
+        if self.app_env == "development":
+            self.canvas_api_url = self.canvas_api_test_url
+        return self
     gsheet_write_rows_max: int = 998
 
 settings = Settings()
@@ -92,3 +99,5 @@ APPLICATIONS_COLLECTION = "applications"
 ACCELERATE_FLEX_COLLECTION = "accelerate_flex"
 PATHWAY_GOALS_COLLECTION = "pathway_goals"
 COURSES_COLLECTION = "courses"
+BADGES_COLLECTION = "badges"
+STUDENT_BADGES_COLLECTION = "student_badges"

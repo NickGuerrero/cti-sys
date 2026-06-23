@@ -12,7 +12,7 @@ from src.database.postgres.models import (
     CanvasID, StudentAttendance, Attendance
 )
 
-from src.utils.rate_limiting.canvas.canvas_api import canvas_client
+from src.utils.rate_limiting.canvas.canvas_api import CanvasClient
 
 
 def get_current_pacific_time() -> datetime:
@@ -21,12 +21,12 @@ def get_current_pacific_time() -> datetime:
     return datetime.now(pacific_time_zone).replace(tzinfo=None)
 
 
-def fetch_canvas_last_login(canvas_id: int) -> Optional[datetime]:
+def fetch_canvas_last_login(canvas_id: int, canvas: CanvasClient) -> Optional[datetime]:
     """Fetch last_login timestamp from Canvas API and convert to Pacific time."""
     if not settings.cti_access_token:
         raise ValueError("Missing Canvas API configuration (CTI_ACCESS_TOKEN)")
-    
-    response = canvas_client.get(f"/users/{canvas_id}", params={"include[]": "last_login"})
+
+    response = canvas.get(f"/users/{canvas_id}", params={"include[]": "last_login"})
     
     if response.status_code == 404:
         return None
@@ -68,13 +68,13 @@ def check_attendance(db: Session, cti_id: int, threshold_weeks: int) -> bool:
     return attendance_exists is not None
 
 
-def check_canvas(db: Session, cti_id: int, threshold_weeks: int) -> Tuple[bool, Optional[datetime]]:
+def check_canvas(db: Session, cti_id: int, threshold_weeks: int, canvas: CanvasClient) -> Tuple[bool, Optional[datetime]]:
     """Check if a student has accessed Canvas within the threshold period."""
     canvas_record = db.query(CanvasID).filter(CanvasID.cti_id == cti_id).first()
     if not canvas_record:
         return False, None
-    
-    last_login = fetch_canvas_last_login(canvas_record.canvas_id)
+
+    last_login = fetch_canvas_last_login(canvas_record.canvas_id, canvas)
     if not last_login:
         return False, None
     
@@ -120,14 +120,15 @@ def process_student_activity(
     db: Session,
     student: Student,
     att_threshold: int,
-    canvas_threshold: int
+    canvas_threshold: int,
+    canvas: CanvasClient,
 ) -> Dict[str, Any]:
     """Process a single student's activity check."""
     cti_id = student.cti_id
-    
+
     # Check both activity types
     has_attendance_activity = check_attendance(db, cti_id, att_threshold)
-    has_canvas_activity, last_canvas_access = check_canvas(db, cti_id, canvas_threshold)
+    has_canvas_activity, last_canvas_access = check_canvas(db, cti_id, canvas_threshold, canvas)
     
     # Student is active if they have either type of activity
     is_active = has_attendance_activity or has_canvas_activity
@@ -165,12 +166,14 @@ def check_all_students(
     Check and update activity status for all active Accelerate students.
     Commits changes per student to avoid long transactions.
     """
+    canvas = CanvasClient()
+
     active_students = db.query(Student).join(
         Accelerate, Student.cti_id == Accelerate.cti_id
     ).filter(
         Student.active == True
     ).all()
-    
+
     results = {
         "status": 200,
         "students_processed": len(active_students),
@@ -182,7 +185,7 @@ def check_all_students(
     
     for student in active_students:
         try:
-            result = process_student_activity(db, student, att_threshold, canvas_threshold)
+            result = process_student_activity(db, student, att_threshold, canvas_threshold, canvas)
             
             if "error" in result:
                 results["errors"].append(result)

@@ -2,7 +2,14 @@ from typing import Any, Dict, Sequence
 from pymongo import IndexModel
 from pymongo.database import Database
 
-from src.config import ACCELERATE_FLEX_COLLECTION, APPLICATIONS_COLLECTION, COURSES_COLLECTION, PATHWAY_GOALS_COLLECTION
+from src.config import (
+    ACCELERATE_FLEX_COLLECTION,
+    APPLICATIONS_COLLECTION,
+    BADGES_COLLECTION,
+    COURSES_COLLECTION,
+    PATHWAY_GOALS_COLLECTION,
+    STUDENT_BADGES_COLLECTION,
+)
 
 class CollectionProps:
     def __init__(self, schema: Dict[str, Any], indexes: Sequence[IndexModel]):
@@ -200,8 +207,129 @@ collections: dict[str, CollectionProps] = {
             }
         },
         indexes=[
+            IndexModel("canvas_id")
         ]
-    )
+    ),
+    BADGES_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Badge Object Validation",
+            "required": ["parchment_id"],
+            "properties": {
+                "parchment_id": {
+                    "bsonType": "string",
+                    "description": "Must include the unique Parchment badge entityId as a string value"
+                },
+                "canvas_id": {
+                    "bsonType": ["int", "null"],
+                    "description": "Must include the associated Canvas course ID as an integer value, or null if not linked"
+                },
+                "badge_name": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the badge name as a string value"
+                },
+                "image_url": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the Parchment-hosted badge image URL as a string value"
+                },
+                "last_updated": {
+                    "bsonType": ["date", "null"],
+                    "description": "Must include the date this badge record was last synced as a UTC datetime"
+                },
+                "version": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the badge version as a string value"
+                },
+                "description": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the badge description as a string value"
+                },
+            },
+            "additionalProperties": True
+        },
+        indexes=[
+            IndexModel("parchment_id", unique=True),
+            IndexModel("canvas_id"),
+        ]
+    ),
+    STUDENT_BADGES_COLLECTION: CollectionProps(
+        schema={
+            "bsonType": "object",
+            "title": "Student Badge Object Validation",
+            "required": ["cti_id", "parchment_id"],
+            "properties": {
+                "cti_id": {
+                    "bsonType": "int",
+                    "description": "Must include the student's CTI ID as an integer value"
+                },
+                "student_name": {
+                    "bsonType": ["string", "null"],
+                    "description": "Must include the student's name as a string value"
+                },
+                "badge_info": {
+                    "bsonType": ["object", "null"],
+                    "description": "Must include a snapshot of badge info at time of record creation",
+                    "properties": {
+                        "badge_name": {
+                            "bsonType": ["string", "null"],
+                            "description": "Badge name at time of record creation"
+                        },
+                        "parchment_id": {
+                            "bsonType": ["string", "null"],
+                            "description": "Parchment badge entityId"
+                        },
+                        "image_url": {
+                            "bsonType": ["string", "null"],
+                            "description": "Badge image URL at time of record creation"
+                        },
+                        "version": {
+                            "bsonType": ["string", "null"],
+                            "description": "Badge version at time of record creation"
+                        },
+                    }
+                },
+                "parchment_id": {
+                    "bsonType": "string",
+                    "description": "Must include the Parchment badge entityId as a string value"
+                },
+                "completion_percentage": {
+                    "bsonType": ["double", "null"],
+                    "description": "Must include the student's current completion percentage for this badge"
+                },
+                "date_awarded": {
+                    "bsonType": ["date", "null"],
+                    "description": "Must include the date the badge was awarded, or null if not yet awarded"
+                },
+                "artifacts": {
+                    "bsonType": ["array", "null"],
+                    "description": "Must include a list of artifact objects associated with this badge",
+                    "items": {
+                        "bsonType": "object",
+                        "properties": {
+                            "title": {
+                                "bsonType": ["string", "null"],
+                                "description": "Artifact title"
+                            },
+                            "url": {
+                                "bsonType": ["string", "null"],
+                                "description": "Artifact URL"
+                            },
+                            "image_url": {
+                                "bsonType": ["string", "null"],
+                                "description": "Artifact image URL"
+                            },
+                        }
+                    }
+                },
+            },
+            "additionalProperties": True
+        },
+        indexes=[
+            IndexModel("cti_id"),
+            IndexModel("parchment_id"),
+            IndexModel([("cti_id", 1), ("parchment_id", 1)], unique=True),
+        ]
+    ),
 }
 
 def init_collections(mongo: Database, with_validators=True):
